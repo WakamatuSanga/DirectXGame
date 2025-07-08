@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES
 #include"Matrix4x4.h"
 #include <Windows.h>
 #include <cstdint>
@@ -26,6 +27,11 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #pragma comment(lib,"dxcompiler.lib")
 
 using namespace MatrixMath;
+// 16分割
+const int kSubdivision = 16;
+// 頂点数
+int kNumVertices = kSubdivision * kSubdivision * 6;
+
 // 拡大縮小行列S
 Matrix4x4 Matrix4x4MakeScaleMatrix(const Vector3& s) {
 	Matrix4x4 result = {};
@@ -208,7 +214,71 @@ void Log(std::ostream& os, const std::string& message) {
 }
 
 #pragma endregion
+// 球の頂点生成関数_05_00_OTHER新しい書き方
+void GenerateSphereVertices(VertexData* vertices, int kSubdivision,
+	float radius) {
+	// 経度(360)
+	const float kLonEvery = static_cast<float>(M_PI * 2.0f) / kSubdivision;
+	// 緯度(180)
+	const float kLatEvery = static_cast<float>(M_PI) / kSubdivision;
 
+	for (int latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+		float lat = -static_cast<float>(M_PI) / 2.0f + kLatEvery * latIndex;
+
+		for (int lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+			float lon = kLonEvery * lonIndex;
+
+			// 三角形1//こういう書き方もある
+			// verA
+			VertexData vertA = {
+				cosf(lat) * cosf(lon), /// 改行が気持ち悪いのでここにたくさん文字
+				sinf(lat),
+				cosf(lat) * sinf(lon),
+				1.0f,
+				{float(lonIndex) / float(kSubdivision),
+				 1.0f - float(latIndex) / float(kSubdivision)} };
+
+			VertexData vertB = {
+				cosf(lat + kLatEvery) * cosf(lon),
+				sinf(lat + kLatEvery),
+				cosf(lat + kLatEvery) * sinf(lon),
+				1.0f,
+				{static_cast<float>(lonIndex) / kSubdivision,
+				 1.0f - static_cast<float>(latIndex + 1) / kSubdivision} };
+
+			VertexData vertC = {
+				cosf(lat) * cosf(lon + kLonEvery), // x
+				sinf(lat),                         // y
+				cosf(lat) * sinf(lon + kLonEvery), // z
+				1.0f,                              // w
+				{
+					static_cast<float>(lonIndex + 1) / kSubdivision,   // u
+					1.0f - static_cast<float>(latIndex) / kSubdivision // v
+				} };
+
+			VertexData vertD = {
+				cosf(lat + kLatEvery) * cosf(lon + kLonEvery), // x
+				sinf(lat + kLatEvery),                         // y
+				cosf(lat + kLatEvery) * sinf(lon + kLonEvery), // z
+				1.0f,                                          // w
+				{
+					static_cast<float>(lonIndex + 1) / kSubdivision,       // u
+					1.0f - static_cast<float>(latIndex + 1) / kSubdivision // v
+				} };
+
+			// 初期位置
+			uint32_t startIndex = (latIndex * kSubdivision + lonIndex) * 6;
+
+			vertices[startIndex + 0] = vertA;
+			vertices[startIndex + 1] = vertB;
+			vertices[startIndex + 2] = vertC;
+			vertices[startIndex + 3] = vertC;
+			vertices[startIndex + 4] = vertD;
+			vertices[startIndex + 5] = vertB;
+		
+		}
+	}
+}
 #pragma region ウィンドウ関数
 // ウィンドウプロシーシャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -1023,7 +1093,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexDataSprite[5].texcoord = { 1.0f, 1.0f };
 
 #pragma endregion
-
+	// スフィア作成_05_00_OTHER
+	GenerateSphereVertices(vertexData, kSubdivision, 0.5f);
 #pragma region ViewportとScissor
 
 	// ビューボート
@@ -1228,7 +1299,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 #pragma endregion
-
+			// 描画！(DRAWCALL/ドローコール)。３頂点で１つのインスタンス。インスタンスについては今後_05_00_OHTER
+			commandList->DrawInstanced(kNumVertices, 1, 0, 0);
 			// 描画
 		  // spriteの描画04_00
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
