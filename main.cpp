@@ -26,6 +26,91 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #pragma comment(lib,"dxcompiler.lib")
 
 using namespace MatrixMath;
+// 拡大縮小行列S
+Matrix4x4 Matrix4x4MakeScaleMatrix(const Vector3& s) {
+	Matrix4x4 result = {};
+	result.m[0][0] = s.x;
+	result.m[1][1] = s.y;
+	result.m[2][2] = s.z;
+	result.m[3][3] = 1.0f;
+	return result;
+}
+
+// X軸回転行列R
+Matrix4x4 MakeRotateXMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = 1.0f;
+	result.m[1][1] = std::cos(radian);
+	result.m[1][2] = std::sin(radian);
+	result.m[2][1] = -std::sin(radian);
+	result.m[2][2] = std::cos(radian);
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+// Y軸回転行列R
+Matrix4x4 MakeRotateYMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = std::cos(radian);
+	result.m[0][2] = std::sin(radian);
+	result.m[1][1] = 1.0f;
+	result.m[2][0] = -std::sin(radian);
+	result.m[2][2] = std::cos(radian);
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+// Z軸回転行列R
+Matrix4x4 MakeRotateZMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = std::cos(radian);
+	result.m[0][1] = -std::sin(radian);
+	result.m[1][0] = std::sin(radian);
+	result.m[1][1] = std::cos(radian);
+	result.m[2][2] = 1.0f;
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+// 行列の積
+Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2) {
+	Matrix4x4 result{};
+	for (int i = 0; i < 4; ++i)
+		for (int j = 0; j < 4; ++j)
+			for (int k = 0; k < 4; ++k)
+				result.m[i][j] += m1.m[i][k] * m2.m[k][j];
+	return result;
+}
+// 平行移動行列T
+Matrix4x4 MakeTranslateMatrix(const Vector3& tlanslate) {
+	Matrix4x4 result = {};
+	result.m[0][0] = 1.0f;
+	result.m[1][1] = 1.0f;
+	result.m[2][2] = 1.0f;
+	result.m[3][3] = 1.0f;
+	result.m[3][0] = tlanslate.x;
+	result.m[3][1] = tlanslate.y;
+	result.m[3][2] = tlanslate.z;
+
+	return result;
+}
+// ワールドマトリックス、メイクアフィン
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate,
+	const Vector3& translate) {
+	Matrix4x4 scaleMatrix = Matrix4x4MakeScaleMatrix(scale);
+	Matrix4x4 rotateX = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateY = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZ = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateMatrix = Multiply(Multiply(rotateX, rotateY), rotateZ);
+	Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
+
+	Matrix4x4 worldMatrix =
+		Multiply(Multiply(scaleMatrix, rotateMatrix), translateMatrix);
+	return worldMatrix;
+}
 
 struct Vector2 {
 	float x;
@@ -877,6 +962,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
+	// Sprite用の頂点リソースを作る
+	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
+
+	// 頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
+
+	// リソースの先頭のアドレスから使う
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+
+	// 使用するリソースのサイズは頂点6つ分のサイズ
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+
+	// 1頂点あたりのサイズ
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+
 	// 頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
 	// 書き込むためのアドレス取得
@@ -900,6 +1000,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 右下2
 	vertexData[5] = { 0.5f,-0.5f,-0.5f,1.0f };
 	vertexData[5].texcoord = { 1.0f,1.0f };
+
+	// sprite用の頂点リソースにデータを書き込む
+	VertexData* vertexDataSprite = nullptr;
+	//  書き込むためのアドレスを取得
+	vertexResourceSprite->Map(
+		0, nullptr,
+		reinterpret_cast<void**>(&vertexDataSprite)); 
+	// 1枚目の三角形
+	vertexDataSprite[0].position = { 0.0f, 360.0f, 0.0f, 1.0f };
+	vertexDataSprite[0].texcoord = { 0.0f, 1.0f };
+	vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[1].texcoord = { 0.0f, 0.0f };
+	vertexDataSprite[2].position = { 640.0f, 360.0f, 0.0f, 1.0f };
+	vertexDataSprite[2].texcoord = { 1.0f, 1.0f };
+	// ２枚目の三角形
+	vertexDataSprite[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[3].texcoord = { 0.0f, 0.0f };
+	vertexDataSprite[4].position = { 640.0f, 0.0f, 0.0f, 1.0f }; 
+	vertexDataSprite[4].texcoord = { 1.0f, 0.0f };
+	vertexDataSprite[5].position = { 640.0f, 360.0f, 0.0f, 1.0f };
+	vertexDataSprite[5].texcoord = { 1.0f, 1.0f };
 
 #pragma endregion
 
@@ -954,6 +1075,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 #pragma endregion
 
+
+	// 1つ分のサイズを用意する04_00
+	ID3D12Resource* transformationMatrixResourceSprite =
+		CreateBufferResource(device, sizeof(Matrix4x4));
+	// sprite用のデータを書き込む04_00
+	Matrix4x4* transformationMatrixDataSprite = nullptr;
+	// sprite用の書き込むためのアドレスを取得04_00
+	transformationMatrixResourceSprite->Map(
+		0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	// 単位行列を書き込んでおく04_00
+	*transformationMatrixDataSprite = MakeIdentity4x4();
+
 #pragma region ImGuiの初期化
 
 	IMGUI_CHECKVERSION();
@@ -970,12 +1103,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 #pragma endregion
 
-
-
-
-
-
-
+	// 変数//
+   // spriteトランスフォーム
+	Transform transformSprite{
+		{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	// トランスフォーム
+	Transform transform{
+		{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	// カメラトランスフォーム
+	Transform cameraTransform{
+		{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
 
 	MSG msg{};
 
@@ -998,6 +1135,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::End();
 			// ゲームの処理
 
+
+			// Sprite用のworldviewProjectionMatrixを作る04_00
+			Matrix4x4 worldMatrixSprite =
+				MakeAffineMatrix(transformSprite.scale, transformSprite.rotate,
+					transformSprite.translate);
+			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(
+				0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 woroldViewProjectionMatrixSprite =
+				Multiply(worldMatrixSprite,
+					Multiply(viewMatrixSprite, projectionMatrixSprite));
+			*transformationMatrixDataSprite = woroldViewProjectionMatrixSprite;
 
 
 			// これから書き込むバックバッファのインデックスを取得
@@ -1080,7 +1229,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 #pragma endregion
 
-
+			// 描画
+		  // spriteの描画04_00
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			commandList->SetGraphicsRootConstantBufferView(
+				1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+			commandList->DrawInstanced(6, 1, 0, 0);
 
 			// 実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
