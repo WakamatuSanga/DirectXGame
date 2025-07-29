@@ -1290,6 +1290,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			ImGui::ShowDemoWindow();
 			ImGui::DragFloat("rotate.y", &transfrom.rotate.y, 0.1f);
+			ImGui::DragFloat("TopLeftX", &viewport.TopLeftX, 1.0f);
+			ImGui::DragFloat("TopLeftY", &viewport.TopLeftY, 1.0f);
+			ImGui::DragFloat("Width", &viewport.Width, 1.0f);
+			ImGui::DragFloat("Height", &viewport.Height, 1.0f);
 			ImGui::Begin("Settings");
 			ImGui::ColorEdit4("material", &materialDara->x, ImGuiColorEditFlags_AlphaPreview);
 			ImGui::End();
