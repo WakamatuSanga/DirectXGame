@@ -1667,8 +1667,99 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     bool useMonstarBall = true;
 
     ID3D12PipelineState* graphicsPinelineState = nullptr;
+    //CG3_00_02
+    ID3D12PipelineState* psoNormal = nullptr;
+    ID3D12PipelineState* psoAdd = nullptr;
+    ID3D12PipelineState* psoSubtract = nullptr;
+    ID3D12PipelineState* psoMultiply = nullptr;
+    ID3D12PipelineState* psoScreen = nullptr;
+    ID3D12PipelineState* psoNone = nullptr;
+
     hr = device->CreateGraphicsPipelineState(
         &graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPinelineState));
+    assert(SUCCEEDED(hr));
+
+    //CG3_00_02
+    // --- 各種ブレンドモード用のPSOを生成 ---
+
+// 1. 通常ブレンド(Normal)
+    D3D12_BLEND_DESC normalBlendDesc = {};
+    normalBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    normalBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    normalBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    normalBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    normalBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    normalBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    normalBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+    normalBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    graphicsPipelineStateDesc.BlendState = normalBlendDesc; // ブレンド設定を差し替え
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&psoNormal));
+    assert(SUCCEEDED(hr));
+
+    // 2. 加算ブレンド(Add)
+    D3D12_BLEND_DESC addBlendDesc = {};
+    addBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    addBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    addBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    addBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    addBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    addBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    addBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+    addBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    graphicsPipelineStateDesc.BlendState = addBlendDesc;
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&psoAdd));
+    assert(SUCCEEDED(hr));
+
+    // 3. 減算ブレンド(Subtract)
+    D3D12_BLEND_DESC subtractBlendDesc = {};
+    subtractBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    subtractBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    subtractBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
+    subtractBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    subtractBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    subtractBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    subtractBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+    subtractBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+    graphicsPipelineStateDesc.BlendState = subtractBlendDesc;
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&psoSubtract));
+    assert(SUCCEEDED(hr));
+
+    // 4. 乗算ブレンド(Multiply)
+    D3D12_BLEND_DESC multiplyBlendDesc = {};
+    multiplyBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    multiplyBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    multiplyBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    multiplyBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ZERO;
+    multiplyBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_SRC_COLOR;
+    multiplyBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    multiplyBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+    multiplyBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+    graphicsPipelineStateDesc.BlendState = multiplyBlendDesc;
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&psoMultiply));
+    assert(SUCCEEDED(hr));
+
+
+    // 5. スクリーンブレンド(Screen)
+    D3D12_BLEND_DESC screenBlendDesc = {};
+    screenBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    screenBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    screenBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    screenBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
+    screenBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    screenBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    screenBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    screenBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+    graphicsPipelineStateDesc.BlendState = screenBlendDesc;
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&psoScreen));
+    assert(SUCCEEDED(hr));
+
+
+    // 6. ブレンドなし(None)
+    D3D12_BLEND_DESC noneBlendDesc = {};
+    noneBlendDesc.RenderTarget[0].BlendEnable = FALSE;
+    noneBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    graphicsPipelineStateDesc.BlendState = noneBlendDesc;
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&psoNone));
     assert(SUCCEEDED(hr));
 
     // スフィア作成_05_00_OTHER
@@ -1724,13 +1815,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             ImGui::SliderFloat("z", &directionalLightData->direction.z, -10.0f,
                 10.0f);
             ImGui::Text("Color");
-            ImGui::ColorEdit4("material", &materialData->color.x);
+            ImGui::ColorEdit4("Color", &materialData->color.x);
             ImGui::Text("UVTransform");
             ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f,
                 -10.0f, 10.0f);
             ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f,
                 10.0f);
             ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+
+            ImGui::Text("Sprite Blend Mode");
+            // 現在選択中のブレンドモードを保持する変数
+            static int currentBlendMode = 0;
+            const char* blendModeNames[] = { "Normal", "Add", "Subtract", "Multiply", "Screen", "None" };
+            ImGui::Combo("BlendMode", &currentBlendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
 
             ImGui::End();
 
@@ -1837,7 +1934,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             commandList->RSSetScissorRects(1, &scissorRect); // Scirssorを設定
             // RootSignatureを設定。PS0に設定しているけど別途設定が必要
             commandList->SetGraphicsRootSignature(rootSignature);
-            commandList->SetPipelineState(graphicsPinelineState);     // PS0を設定
+            //commandList->SetPipelineState(graphicsPinelineState);     // PS0を設定
 
             // 形状を設定。PS0に設定しているものとはまた別。同じものを設定すると考えていけばよい
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1856,12 +1953,45 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             commandList->SetGraphicsRootConstantBufferView(
                 3, directionalLightResource->GetGPUVirtualAddress());
 
-            commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+            /*commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
             commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
+            commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);*/
+
+            //CG3_00_02
+            // ▼▼▼ 3Dモデルの描画 ▼▼▼
+            commandList->SetPipelineState(psoNormal); // 3Dモデルは常に通常ブレンドで描画
+            commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2); // axis.objはこちらのテクスチャ
             commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
+
+            // ▼▼▼ スプライトの描画 ▼▼▼
+            // ImGuiで選択されたブレンドモードに応じてPSOを切り替える
+            switch (currentBlendMode) {
+            case 0: // Normal
+                commandList->SetPipelineState(psoNormal);
+                break;
+            case 1: // Add
+                commandList->SetPipelineState(psoAdd);
+                break;
+            case 2: // Subtract
+                commandList->SetPipelineState(psoSubtract);
+                break;
+            case 3: // Multiply
+                commandList->SetPipelineState(psoMultiply);
+                break;
+            case 4: // Screen
+                commandList->SetPipelineState(psoScreen);
+                break;
+            case 5: // None
+                commandList->SetPipelineState(psoNone);
+                break;
+            default:
+                commandList->SetPipelineState(psoNormal);
+                break;
+            }
 
             // IBVを設定
             commandList->IASetIndexBuffer(&indexBufferViewSprite);
@@ -1879,7 +2009,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             commandList->SetGraphicsRootConstantBufferView(
                 1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 
-
+            // スプライトの描画命令（インデックスバッファを使うのでDrawIndexedInstanced）
+            commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
             // 描画の最後です//----------------------------------------------------
@@ -1952,6 +2083,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     // --- パイプライン / シェーダ ---
     graphicsPinelineState->Release();
+    psoNormal->Release();
+    psoAdd->Release();
+    psoSubtract->Release();
+    psoMultiply->Release();
+    psoScreen->Release();
+    psoNone->Release();
     signatureBlob->Release();
     if (errorBlob) {
         errorBlob->Release();
