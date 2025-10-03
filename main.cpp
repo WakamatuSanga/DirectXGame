@@ -1724,7 +1724,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             ImGui::SliderFloat("z", &directionalLightData->direction.z, -10.0f,
                 10.0f);
             ImGui::Text("Color");
-
+            ImGui::ColorEdit4("material", &materialData->color.x);
             ImGui::Text("UVTransform");
             ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f,
                 -10.0f, 10.0f);
