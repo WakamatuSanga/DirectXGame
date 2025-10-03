@@ -1300,7 +1300,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     assert(SUCCEEDED(hr));
 
     // Textureを読んで転送する03_00
-    DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+    DirectX::ScratchImage mipImages = LoadTexture("resources/fence.png");
     const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
     ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
     ID3D12Resource* intermediateResource =
@@ -1309,7 +1309,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
     // --モデルデータを読み込む--
-    ModelData modelData = LoadObjFile("Resources", "axis.obj");
+    ModelData modelData = LoadObjFile("Resources", "fence.obj");
 
 
 
@@ -1961,15 +1961,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
             //CG3_00_02
             // ▼▼▼ 3Dモデルの描画 ▼▼▼
-            commandList->SetPipelineState(psoNormal); // 3Dモデルは常に通常ブレンドで描画
-            commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2); // axis.objはこちらのテクスチャ
-            commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-
-
-            // ▼▼▼ スプライトの描画 ▼▼▼
             // ImGuiで選択されたブレンドモードに応じてPSOを切り替える
-            switch (currentBlendMode) {
+            switch (currentBlendMode) { 
             case 0: // Normal
                 commandList->SetPipelineState(psoNormal);
                 break;
@@ -1993,13 +1986,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 break;
             }
 
+            //commandList->SetPipelineState(psoNormal); // 3Dモデルは常に通常ブレンドで描画
+            commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // axis.objはこちらのテクスチャ
+            commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+
+
+            // ▼▼▼ スプライトの描画 ▼▼▼
             // IBVを設定
             commandList->IASetIndexBuffer(&indexBufferViewSprite);
 
             // spriteの描画04_00
             commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
             // 描画
-            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+            //commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
             // UvChecker // マテリアルCbufferの場所を設定05_03変更これ書くとUvChackerがちゃんとする
             commandList->SetGraphicsRootConstantBufferView(
@@ -2009,8 +2009,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             commandList->SetGraphicsRootConstantBufferView(
                 1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 
-            // スプライトの描画命令（インデックスバッファを使うのでDrawIndexedInstanced）
-            commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+            //// スプライトの描画命令（インデックスバッファを使うのでDrawIndexedInstanced）
+            //commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
             // 描画の最後です//----------------------------------------------------

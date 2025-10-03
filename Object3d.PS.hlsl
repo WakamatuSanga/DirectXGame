@@ -37,7 +37,14 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
 
-    if (gMaterial.enableLighting != 0)//Lightingする場合
+    // テクスチャのアルファ値が0.5未満なら、このピクセルを破棄(描画しない)
+    if (textureColor.a < 0.5f)
+    {
+        discard;
+    }
+    
+    //Lightingする場合
+    if (gMaterial.enableLighting != 0)
     {
 
         float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
