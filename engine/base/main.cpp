@@ -1300,7 +1300,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     assert(SUCCEEDED(hr));
 
     // Textureを読んで転送する03_00
-    DirectX::ScratchImage mipImages = LoadTexture("resources/fence.png");
+    DirectX::ScratchImage mipImages = LoadTexture("resources/obj/axis/uvChecker.png");
     const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
     ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
     ID3D12Resource* intermediateResource =
@@ -1309,7 +1309,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
     // --モデルデータを読み込む--
-    ModelData modelData = LoadObjFile("Resources", "fence.obj");
+    ModelData modelData = LoadObjFile("resources/obj/axis", "fence.obj");
 
 
 
@@ -1412,12 +1412,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     // Shaderをコンパイルする
     IDxcBlob* vertexShaderBlob =
-        CompileShader(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler,
+        CompileShader(L"resources/shaders/Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler,
             includHandler, logStream);
     assert(vertexShaderBlob != nullptr);
 
     IDxcBlob* pixelShaderBlob =
-        CompileShader(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler,
+        CompileShader(L"resources/shaders/Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler,
             includHandler, logStream);
     assert(pixelShaderBlob != nullptr);
 

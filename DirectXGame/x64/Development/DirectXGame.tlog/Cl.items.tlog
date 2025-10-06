@@ -5,5 +5,5 @@ C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\externals\imgui\imgui
 C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\externals\imgui\imgui_impl_win32.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\imgui_impl_win32.obj
 C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\externals\imgui\imgui_tables.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\imgui_tables.obj
 C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\externals\imgui\imgui_widgets.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\imgui_widgets.obj
-C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\main.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\main.obj
-C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\Matrix4x4.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\Matrix4x4.obj
+C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\engine\base\main.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\main.obj
+C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\engine\math\Matrix4x4.cpp;C:\Users\K024G\OneDrive\デスクトップ\CG1\DirectXGame\DirectXGame\x64\Development\Matrix4x4.obj

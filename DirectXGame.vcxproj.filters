@@ -18,10 +18,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="engine\base\main.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Matrix4x4.cpp">
+    <ClCompile Include="engine\math\Matrix4x4.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="externals\imgui\imgui.cpp">
@@ -47,7 +47,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Matrix4x4.h">
+    <ClInclude Include="engine\math\Matrix4x4.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="externals\imgui\imconfig.h">
@@ -81,15 +81,15 @@
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Object3d.PS.hlsl">
+    <FxCompile Include="resources\shaders\Object3d.PS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
-    <FxCompile Include="Object3d.VS.hlsl">
+    <FxCompile Include="resources\shaders\Object3d.VS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Object3d.hlsli">
+    <None Include="resources\shaders\Object3d.hlsli">
       <Filter>リソース ファイル</Filter>
     </None>
   </ItemGroup>
