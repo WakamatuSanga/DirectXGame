@@ -1823,7 +1823,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 10.0f);
             ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 
-            ImGui::Text("Sprite Blend Mode");
+            ImGui::Text("Material Blend Mode");
             // 現在選択中のブレンドモードを保持する変数
             static int currentBlendMode = 0;
             const char* blendModeNames[] = { "Normal", "Add", "Subtract", "Multiply", "Screen", "None" };
