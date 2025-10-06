@@ -1309,7 +1309,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
     // --モデルデータを読み込む--
-    ModelData modelData = LoadObjFile("resources/obj/axis", "fence.obj");
+    ModelData modelData = LoadObjFile("resources/obj/fence", "fence.obj");
 
 
 
