@@ -1,0 +1,22 @@
+Use Adapater:NVIDIA GeForce RTX 3070 Laptop GPU
+
+FeatrueLevel : 12.2
+
+Complete create D3D12Device!!!
+
+Begin CompileShader,path:Object3D.VS.hlsl,profile:vs_6_0
+
+Object3D.VS.hlsl:1:10: fatal error: 'object3d.hlsli' file not found
+#include "object3d.hlsli"
+         ^
+
+Compile Succeeded,path:Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader,path:Object3D.PS.hlsl,profile:ps_6_0
+
+Object3D.PS.hlsl:1:9: fatal error: 'Object3d.hlsli' file not found
+#include"Object3d.hlsli"
+        ^
+
+Compile Succeeded,path:Object3D.PS.hlsl,profile:ps_6_0
+

@@ -16,7 +16,7 @@
 # Mono auto generated filesmono_crash.*
 
 # Build results
-Generated/
+generated/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -52,37 +52,7 @@ artifacts/
 StyleCopReport.xml
 
 # Files built by Visual Studio
-*_i.c
-*_p.c
-*_h.h
-*.ilk
-*.meta
-[Dd]bug/.obj
-[Dd]ebug/.obj
-[Dd]ebugPublic/.obj
-[Rr]elease/.obj
-[Rr]eleases/.obj
-*.iobj
-*.pch
-*.ipdb
-*.pgc
-*.pgd
-*.rsp
-*.sbr
-*.tlb
-*.tli
-*.tlh
-*.tmp
-*.tmp_proj
-*_wpftmp.csproj
-*.log
-*.vspscc
-*.vssscc
-.builds
-*.pidb
-*.idb
-*.svclog
-*.scc
+
 
 # Chutzpah Test files
 _Chutzpah*
