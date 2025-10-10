@@ -1235,7 +1235,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     descriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
     // RootParameter作成。複数設定できるので配列。今回は結果１つだけなので長さ１の配列
     // PixelShaderのMaterialとVertexShaderのTransform
-    D3D12_ROOT_PARAMETER rootParameters[4] = {};
+    //CG3_01_00のために4から5にした
+    D3D12_ROOT_PARAMETER rootParameters[5] = {};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
     rootParameters[0].ShaderVisibility =
         D3D12_SHADER_VISIBILITY_PIXEL;               // PixelShaderで使う
@@ -1253,6 +1254,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRVを使う
     descriptorRange[0].OffsetInDescriptorsFromTableStart =
         D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
+
+    // CG3_01_00||パーティクル用のStructuredBuffer設定を追加
+    D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+    descriptorRangeForInstancing[0].BaseShaderRegister = 0; // t0レジスタ
+    descriptorRangeForInstancing[0].NumDescriptors = 1;
+    descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // VertexShaderで使う
+    rootParameters[4].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+    rootParameters[4].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+    //ここまで
+
+
     descriptionRootSignature.pParameters =
         rootParameters; // ルートパラメータ配列へのポインタ
     descriptionRootSignature.NumParameters =
@@ -1309,7 +1325,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
     // --モデルデータを読み込む--
-    ModelData modelData = LoadObjFile("resources/obj/fence", "fence.obj");
+    ModelData modelData = LoadObjFile("resources/obj/axis", "axis.obj");
 
 
 
@@ -1420,6 +1436,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         CompileShader(L"resources/shaders/Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler,
             includHandler, logStream);
     assert(pixelShaderBlob != nullptr);
+    // --- CG3_01_00_パーティクルシェーダーのコンパイル ---
+    IDxcBlob* particleVertexShaderBlob = 
+        CompileShader(L"resources/shaders/Particle.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includHandler, logStream);
+    assert(particleVertexShaderBlob != nullptr);
+
+    IDxcBlob* particlePixelShaderBlob =
+        CompileShader(L"resources/shaders/Particle.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includHandler, logStream);
+    assert(particlePixelShaderBlob != nullptr);
+    // --- ここまで ---
+
 
     // PSOを生成する
     D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc{};
@@ -1667,6 +1693,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     bool useMonstarBall = true;
 
     ID3D12PipelineState* graphicsPinelineState = nullptr;
+    //CG3_01_00
+    ID3D12PipelineState* particlePipelineState = nullptr; // パーティクル用
     //CG3_00_02
     ID3D12PipelineState* psoNormal = nullptr;
     ID3D12PipelineState* psoAdd = nullptr;
@@ -1678,7 +1706,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     hr = device->CreateGraphicsPipelineState(
         &graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPinelineState));
     assert(SUCCEEDED(hr));
+    // --- ここからCG3_01_00_パーティクル用のPSOを生成 ---
+    // シェーダーをパーティクル用のものに差し替える
+    graphicsPipelineStateDesc.VS = {
+        particleVertexShaderBlob->GetBufferPointer(), particleVertexShaderBlob->GetBufferSize() };
+    graphicsPipelineStateDesc.PS = {
+        particlePixelShaderBlob->GetBufferPointer(), particlePixelShaderBlob->GetBufferSize() };
 
+    hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&particlePipelineState));
+    assert(SUCCEEDED(hr));
+
+    // シェーダーを通常モデル用に戻しておく
+    graphicsPipelineStateDesc.VS = {
+        vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
+    graphicsPipelineStateDesc.PS = {
+        pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
+    // --- ここまで ---
     //CG3_00_02
     // --- 各種ブレンドモード用のPSOを生成 ---
 
@@ -1764,6 +1807,72 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     // スフィア作成_05_00_OTHER
     //GenerateSphereVertices(vertexData, kSubdivision, 1.0f);
+
+      // --- ここからCG3_01_00_パーティクル用リソースを追加 ---
+    //--------------------------
+    // パーティクル用リソース
+    //--------------------------
+    const uint32_t kNumMaxInstances = 256; // パーティクルの最大数 (16x16)
+
+    // パーティクルのモデルデータ（板ポリゴン）を作成
+    ModelData particleModelData{};
+    particleModelData.vertices.resize(4);
+    particleModelData.vertices[0] = { {-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f} };
+    particleModelData.vertices[1] = { {-0.5f,  0.5f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f} };
+    particleModelData.vertices[2] = { { 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f} };
+    particleModelData.vertices[3] = { { 0.5f,  0.5f, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f} };
+
+    // 頂点リソースとビュー
+    ID3D12Resource* particleVertexResource = CreateBufferResource(device, sizeof(VertexData) * particleModelData.vertices.size());
+    D3D12_VERTEX_BUFFER_VIEW particleVertexBufferView{};
+    particleVertexBufferView.BufferLocation = particleVertexResource->GetGPUVirtualAddress();
+    particleVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * particleModelData.vertices.size());
+    particleVertexBufferView.StrideInBytes = sizeof(VertexData);
+    VertexData* particleVertexData = nullptr;
+    particleVertexResource->Map(0, nullptr, reinterpret_cast<void**>(&particleVertexData));
+    std::memcpy(particleVertexData, particleModelData.vertices.data(), sizeof(VertexData)* particleModelData.vertices.size());
+
+    // インデックスリソースとビュー
+    ID3D12Resource* particleIndexResource = CreateBufferResource(device, sizeof(uint32_t) * 6);
+    D3D12_INDEX_BUFFER_VIEW particleIndexBufferView{};
+    particleIndexBufferView.BufferLocation = particleIndexResource->GetGPUVirtualAddress();
+    particleIndexBufferView.SizeInBytes = sizeof(uint32_t) * 6;
+    particleIndexBufferView.Format = DXGI_FORMAT_R32_UINT;
+    uint32_t* particleIndexData = nullptr;
+    particleIndexResource->Map(0, nullptr, reinterpret_cast<void**>(&particleIndexData));
+    particleIndexData[0] = 0; particleIndexData[1] = 1; particleIndexData[2] = 2;
+    particleIndexData[3] = 1; particleIndexData[4] = 3; particleIndexData[5] = 2;
+
+    // インスタンシング用のTransformationMatrixリソース (StructuredBuffer)
+    ID3D12Resource* instancingResource = CreateBufferResource(device, sizeof(TransformationMatrix) * kNumMaxInstances);
+    TransformationMatrix* instancingData = nullptr;
+    instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
+
+    // インスタンシング用リソースのSRVを作成
+    D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+    instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    instancingSrvDesc.Buffer.FirstElement = 0;
+    instancingSrvDesc.Buffer.NumElements = kNumMaxInstances;
+    instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+    D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+    device->CreateShaderResourceView(instancingResource, &instancingSrvDesc, instancingSrvHandleCPU);
+
+    // 各パーティクルのTransformを管理する配列
+    std::vector<Transform> particleTransforms(kNumMaxInstances);
+    for (uint32_t i = 0; i < kNumMaxInstances; ++i) {
+        particleTransforms[i] = {
+            {0.2f, 0.2f, 0.2f},
+            {0.0f, 0.0f, 0.0f},
+            {-1.5f + (float(i % 16)) * 0.2f, 1.5f - (float(i / 16)) * 0.2f, 0.0f}
+        };
+    }
+    // --- ここまで ---
+
+
 
     // ImGuiの初期化。詳細はさして重要ではないので解説は省略する。02_03
     // こういうもんである02_03
@@ -1959,6 +2068,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
             commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);*/
 
+            // --- ここからCG3_01_00_パーティクルの描画処理 ---
+       // ▼▼▼ パーティクルの描画 ▼▼▼
+            commandList->SetPipelineState(particlePipelineState);
+            commandList->IASetVertexBuffers(0, 1, &particleVertexBufferView);
+            commandList->IASetIndexBuffer(&particleIndexBufferView);
+            commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress()); // マテリアル
+            commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress()); // ライティング
+            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // テクスチャ
+            commandList->SetGraphicsRootDescriptorTable(4, instancingSrvHandleGPU); // ★インスタンシング用データ
+
+            commandList->DrawIndexedInstanced(6, kNumMaxInstances, 0, 0, 0); // ★一括描画命令
+            // --- ここまで変更・追記 ---
+
             //CG3_00_02
             // ▼▼▼ 3Dモデルの描画 ▼▼▼
             // ImGuiで選択されたブレンドモードに応じてPSOを切り替える
@@ -2128,7 +2250,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // --- 照明 ---
     directionalLightResource->Release();
 
-
+    // --- パーティクルリソース ---
+    particlePipelineState->Release();
+    particleVertexShaderBlob->Release();
+    particlePixelShaderBlob->Release();
+    particleVertexResource->Release();
+    particleIndexResource->Release();
+    instancingResource->Release();
 
 #ifdef _DEBUG
     // --- デバッグレイヤー（DEBUG時のみ） ---
