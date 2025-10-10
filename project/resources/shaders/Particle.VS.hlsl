@@ -1,5 +1,3 @@
-// Particle.VS.hlsl (この内容をそのままコピー＆ペーストしてください)
-
 #include "Particle.hlsli"
 
 struct TransformationMatrix
@@ -21,12 +19,11 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceID : SV_Instan
 {
     VertexShaderOutput output;
 
-    TransformationMatrix matrix=gTransformationMatrices[instanceID];
-
-    // ★★★修正済みの正しいコード★★★
-    output.position = mul(input.position,matrix.WVP);
+    TransformationMatrix output = gTransformationMatrices[instanceID];
+    
+    output.position = mul(input.position, output.WVP);
     output.texcoord = input.texcoord;
-    output.normal = normalize(mul(input.normal, (float32_t3x3)matrix.World));
+    output.normal = normalize(mul(input.normal, (float32_t3x3) output.World));
     
     return output;
 }

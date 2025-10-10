@@ -9,9 +9,9 @@ struct Material
 
 struct DirecctionalLight
 {
-    float32_t4 color; //!<ライトの色
-    float32_t3 direction; //!< ライトの向き
-    float intensity; //!<輝度
+    float32_t4 color; 
+    float32_t3 direction; 
+    float intensity; 
 };
 
 Texture2D<float32_t4> gTexture : register(t0);
@@ -32,18 +32,18 @@ PixelShaderOutput main(VertexShaderOutput input)
     PixelShaderOutput output;
     output.color = gMaterial.color;
 
-     // UV変換
+     
     float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
 
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
 
-    // テクスチャのアルファ値が0.5未満なら、このピクセルを破棄(描画しない)
+  
     if (textureColor.a <= 0.5f)
     {
         discard;
     }
     
-    //Lightingする場合
+   
     if (gMaterial.enableLighting != 0)
     {
 
