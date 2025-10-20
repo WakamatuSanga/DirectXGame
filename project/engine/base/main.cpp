@@ -12,6 +12,9 @@
 #include <strsafe.h>
 #include <vector>
 
+// --- Input ---
+#include "engine/Input/Input.h"
+
 // --- Direct3D 12 / DXGI 関連 ---
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -43,7 +46,7 @@
 
 
 // --- その他（必要ならアンコメント） ---
-// #include <format>  // C++20 の format 機能
+ #include <format>  // C++20 の format 機能
 
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd,
@@ -1027,6 +1030,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
 
+	// --- Input 初期化 ---
+	Input * input = new Input();
+
 	// DXGIファクトリーの生成
 	IDXGIFactory7* dxgiFactory = nullptr;
 	// HRESULTはWindows系のエラー子どであり
@@ -1911,6 +1917,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		} else {
 
 			// ここがframeの先頭02_03
+			input->Update();
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
@@ -2238,7 +2245,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 // --- 同期・イベント系 ---
 	CloseHandle(fenceEvent);
 	fence->Release();
-
+	delete input;
 	// --- スワップチェイン / RTV ---
 	rtvDescriptorHeap->Release();
 	swapChainResources[0]->Release();
