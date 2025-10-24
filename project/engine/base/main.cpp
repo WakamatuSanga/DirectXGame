@@ -71,6 +71,10 @@ struct Transform {
 	Vector3 rotate;
 	Vector3 translate;
 };
+struct Particle {
+	Transform transform;
+	Vector3   velocity;
+};
 struct VertexData {
 	Vector4 position;
 	Vector2 texcoord;
@@ -1244,10 +1248,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		D3D12_SHADER_VISIBILITY_PIXEL;               // PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; // レジスタ番号０とバインド
 	// ここから[2]
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
-	rootParameters[1].ShaderVisibility =
-		D3D12_SHADER_VISIBILITY_VERTEX;              // Vertexshaderで使う
-	rootParameters[1].Descriptor.ShaderRegister = 0; // 得wジスタ番号０を使う
+	// [1] Vertex CBV : WVP(b0) ← これを残す
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[1].Descriptor.ShaderRegister = 0;
+
 	// ここまで[2]
 	// 新しいディスクリプタレンジ03_00
 	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
@@ -1260,7 +1265,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		rootParameters; // ルートパラメータ配列へのポインタ
 	descriptionRootSignature.NumParameters =
 		_countof(rootParameters); // 配列の長さ
-
 	// 新しいディスクリプタレンジ03_00
 	// ここから[3]03_00
 	rootParameters[2].ParameterType =
@@ -1669,7 +1673,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
 	// 単位行列を書き込んでおく04_00//これいったん消しました05_03
 	// *transformationMatrixDataSprite = MakeIdentity4x4();
-	
+
 	// ===== ここから追加：パーティクル用インスタンシング =====
 	const uint32_t kNumInstance = 10;   // ← 使う個数。描画/更新の両方で使うのでループより上に置く
 
@@ -1677,6 +1681,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* instancingResource = nullptr;
 	// CPU側から書き込むための先頭ポインタ（Mapして保持）
 	TransformationMatrix* instancingData = nullptr;
+	// CPU側のパーティクル（描画は instancingData を使う）
+	Particle particles[kNumInstance];
+
+	// 斜めスタック（5x2）にする
+	const uint32_t kGridX = 5;
+	const uint32_t kGridY = 2;
+	const float spacing = 0.2f;  // X・Y 間隔
+	const float depthStep = 0.20f; // 1枚ごとの奥行き
+	for (uint32_t i = 0; i < kNumInstance; ++i) {
+		uint32_t x = i % kGridX;
+		uint32_t y = i / kGridX;
+
+		// 画面中央にくるよう原点回りに並べる
+		float fx = float(int(x) - int(kGridX - 1) / 2);
+		float fy = float(int(y) - int(kGridY - 1) / 2);
+
+		particles[i].transform.scale = { 1.0f, 1.0f, 1.0f };
+		particles[i].transform.rotate = { 0.0f, 0.0f, 0.0f };
+		particles[i].transform.translate = { -1.8f + 0.4f * i, -1.0f + 0.2f * i, 0.25f * i };
+		particles[i].velocity = { 0.0f, 0.0f, 0.0f };
+	}
+
+
 	// SRVのハンドル（後でSetGraphicsRootDescriptorTableで使う）
 	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvCPU{};
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvGPU{};
@@ -1774,6 +1801,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// Textureの切り替え
 	bool useMonstarBall = true;
+
+	// ==== Particle 配置パラメータ（ImGui で編集）====
+	float layoutStartX = -1.4f, layoutStartY = -0.8f, layoutStartZ = 0.0f;
+	float layoutStepX = 0.22f, layoutStepY = 0.11f, layoutStepZ = 0.05f;
+	float spriteScaleXY = 0.90f;
+
 
 	ID3D12PipelineState* graphicsPinelineState = nullptr;
 
@@ -1926,6 +1959,88 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::SliderAngle("RotateY", &transform.rotate.y, -180.0f, 180.0f);
 			ImGui::SliderAngle("RotateZ", &transform.rotate.z, -180.0f, 180.0f);
 			ImGui::SliderFloat3("Translate", &transform.translate.x, -5.0f, 5.0f);
+			ImGui::SeparatorText("Particle Layout");
+			ImGui::DragFloat("layoutStartX", &layoutStartX, 0.01f, -5.0f, 5.0f);
+			ImGui::DragFloat("layoutStartY", &layoutStartY, 0.01f, -5.0f, 5.0f);
+			ImGui::DragFloat("layoutStartZ", &layoutStartZ, 0.01f, -5.0f, 5.0f);
+			ImGui::DragFloat("layoutStepX", &layoutStepX, 0.01f, -2.0f, 2.0f);
+			ImGui::DragFloat("layoutStepY", &layoutStepY, 0.01f, -2.0f, 2.0f);
+			ImGui::DragFloat("layoutStepZ", &layoutStepZ, 0.01f, -2.0f, 2.0f);
+
+			// 今の板ポリのサイズも触りたい場合（任意）
+			ImGui::DragFloat("spriteScaleXY", &spriteScaleXY, 0.01f, 0.05f, 5.0f);
+
+			// レイアウトを今すぐ反映（任意）
+			if (ImGui::Button("Apply Layout")) {
+				for (uint32_t i = 0; i < kNumInstance; ++i) {
+					particles[i].transform.translate = {
+						layoutStartX + layoutStepX * i,
+						layoutStartY + layoutStepY * i,
+						layoutStartZ + layoutStepZ * i
+					};
+					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
+					particles[i].velocity = { 0.0f, 0.0f, 0.0f };
+				}
+			}
+
+			static bool play = false;
+
+			if (ImGui::Button(play ? "Stop" : "Start")) {
+				play = !play;
+				// スライド通り、再生を押した瞬間に上向き(0,1,0) m/s を与える
+				for (uint32_t i = 0; i < kNumInstance; ++i) {
+					particles[i].velocity = { 0.0f, 1.0f, 0.0f };
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset")) {
+				const uint32_t kGridX = 5;
+				const uint32_t kGridY = 2;
+				const float spacing = 0.6f;
+				const float depthStep = 0.20f;
+
+				for (uint32_t i = 0; i < kNumInstance; ++i) {
+					uint32_t x = i % kGridX;
+					uint32_t y = i / kGridX;
+					float fx = float(int(x) - int(kGridX - 1) / 2);
+					float fy = float(int(y) - int(kGridY - 1) / 2);
+
+					particles[i].transform.scale = { 1.0f, 1.0f, 1.0f };
+					particles[i].transform.rotate = { 0.0f, 0.0f, 0.0f };
+					particles[i].transform.translate = { -1.8f + 0.4f * i, -1.0f + 0.2f * i, 0.25f * i };
+					particles[i].velocity = { 0.0f, 0.0f, 0.0f };
+				}
+			}
+			// --- Particle Layout UI ---
+			ImGui::SeparatorText("Particle Layout");
+			ImGui::DragFloat3("Start (X,Y,Z)", &layoutStartX, 0.01f, -3.0f, 3.0f);
+			ImGui::DragFloat3("Step  (X,Y,Z)", &layoutStepX, 0.01f, -1.0f, 1.0f);
+			ImGui::SliderFloat("Sprite Scale", &spriteScaleXY, 0.1f, 2.0f);
+
+			static bool autoApply = false;
+			ImGui::Checkbox("Auto Apply (when not playing)", &autoApply);
+			if (ImGui::Button("Apply Layout")) {
+				// 速度はそのまま、位置とスケールだけ反映
+				for (uint32_t i = 0; i < kNumInstance; ++i) {
+					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
+					particles[i].transform.translate = {
+						layoutStartX + layoutStepX * i,
+						layoutStartY + layoutStepY * i,
+						layoutStartZ + layoutStepZ * i
+					};
+				}
+			}
+			// 自動反映（再生中は上書きしない）
+			if (autoApply && !play) {
+				for (uint32_t i = 0; i < kNumInstance; ++i) {
+					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
+					particles[i].transform.translate = {
+						layoutStartX + layoutStepX * i,
+						layoutStartY + layoutStepY * i,
+						layoutStartZ + layoutStepZ * i
+					};
+				}
+			}
 
 			/*   ImGui::ColorEdit4("Color", &(*materialData).x);*/
 			ImGui::Text("useMonstarBall");
@@ -1989,23 +2104,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			wvpData->WVP = worldViewProjectionMatrix;
 			wvpData->World = worldMatrix;
 			// ===== パーティクル（スプライト板ポリ）の行列更新 =====
-			// 3Dカメラの view/projection を使う例（奥行きが欲しい場合）
+			const float kDeltaTime = 1.0f / 60.0f; // スライドの固定Δt
+
 			for (uint32_t i = 0; i < kNumInstance; ++i) {
-				Transform t{};
-				t.scale = { 1.0f, 1.0f, 1.0f };
+				// 再生中だけ速度を位置に反映
+				if (play) {
+					particles[i].transform.translate.x += particles[i].velocity.x * kDeltaTime;
+					particles[i].transform.translate.y += particles[i].velocity.y * kDeltaTime;
+					particles[i].transform.translate.z += particles[i].velocity.z * kDeltaTime;
+				}
 
-				// 少し傾ける
-				t.rotate = { DirectX::XMConvertToRadians(10.0f), DirectX::XMConvertToRadians(17.0f), 0.0f };
-
-				// 斜めに階段状へ（例）
-				float s = float(i);
-				t.translate = { -1.2f + 0.3f * s, -0.6f + 0.15f * s, 0.20f * s };
-
-				Matrix4x4 w = MakeAffineMatrix(t.scale, t.rotate, t.translate);
+				Matrix4x4 w = MakeAffineMatrix(
+					particles[i].transform.scale,
+					particles[i].transform.rotate,
+					particles[i].transform.translate
+				);
 				Matrix4x4 wvp = Multiply(w, Multiply(viewMatrix, projectionMatrix));
 				instancingData[i].WVP = wvp;
 				instancingData[i].World = w;
 			}
+
 
 
 			// Sprite用のworldviewProjectionMatrixを作る04_00
@@ -2182,9 +2300,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//	GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
 
 			//device->CreateShaderResourceView(instancingResource, &instancingSrvDesc, instancingSrvCPU);
-
-			// スプライトの描画命令（インデックスバッファを使うのでDrawIndexedInstanced）
-			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 			// 描画の最後です//----------------------------------------------------

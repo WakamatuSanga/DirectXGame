@@ -115,7 +115,6 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="resources\Particle.PS.hlsl" />
-    <FxCompile Include="resources\Particle.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\shaders\Object3d.hlsli">
