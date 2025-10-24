@@ -114,10 +114,12 @@
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="resources\Particle.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\shaders\Object3d.hlsli">
       <Filter>リソース ファイル</Filter>
     </None>
+    <None Include="resources\Particle.hlsli" />
   </ItemGroup>
 </Project>
