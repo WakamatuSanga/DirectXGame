@@ -11,6 +11,7 @@
 #include <string>
 #include <strsafe.h>
 #include <vector>
+#include <random> 
 
 // --- Direct3D 12 / DXGI 関連 ---
 #include <d3d12.h>
@@ -1802,6 +1803,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// Textureの切り替え
 	bool useMonstarBall = true;
 
+	// ==== Random ====
+	std::random_device seedGenerator;
+	std::mt19937 randomEngine(seedGenerator());
+
+	// ImGui から調整できる乱数パラメータ
+	float randPosRange = 0.15f;   // 位置のゆらぎ(±この値を加える)
+	float randVelRange = 1.0f;    // 速度の最大値(±この値)
+	float randVelZScale = 0.0f;   // Z 方向だけ倍率（重なり感を保ちたい時は 0〜0.2 など）
 	// ==== Particle 配置パラメータ（ImGui で編集）====
 	float layoutStartX = -1.4f, layoutStartY = -0.8f, layoutStartZ = 0.0f;
 	float layoutStepX = 0.22f, layoutStepY = 0.11f, layoutStepZ = 0.05f;
@@ -1966,9 +1975,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::DragFloat("layoutStepX", &layoutStepX, 0.01f, -2.0f, 2.0f);
 			ImGui::DragFloat("layoutStepY", &layoutStepY, 0.01f, -2.0f, 2.0f);
 			ImGui::DragFloat("layoutStepZ", &layoutStepZ, 0.01f, -2.0f, 2.0f);
-
 			// 今の板ポリのサイズも触りたい場合（任意）
 			ImGui::DragFloat("spriteScaleXY", &spriteScaleXY, 0.01f, 0.05f, 5.0f);
+			ImGui::SeparatorText("Particles / Layout");
+			ImGui::DragFloat("layoutStartX", &layoutStartX, 0.01f, -5.0f, 5.0f);
+			ImGui::DragFloat("layoutStartY", &layoutStartY, 0.01f, -5.0f, 5.0f);
+			ImGui::DragFloat("layoutStartZ", &layoutStartZ, 0.01f, -5.0f, 5.0f);
+			ImGui::DragFloat("layoutStepX", &layoutStepX, 0.001f, -1.0f, 1.0f);
+			ImGui::DragFloat("layoutStepY", &layoutStepY, 0.001f, -1.0f, 1.0f);
+			ImGui::DragFloat("layoutStepZ", &layoutStepZ, 0.001f, -1.0f, 1.0f);
+			ImGui::DragFloat("SpriteScale", &spriteScaleXY, 0.01f, 0.1f, 3.0f);
+
+			ImGui::SeparatorText("Random Init");
+			ImGui::DragFloat("PosJitter (+/-)", &randPosRange, 0.005f, 0.0f, 1.0f);
+			ImGui::DragFloat("VelRange (+/-)", &randVelRange, 0.01f, 0.0f, 10.0f);
+			ImGui::DragFloat("VelZ Scale", &randVelZScale, 0.01f, 0.0f, 2.0f);
 
 			// レイアウトを今すぐ反映（任意）
 			if (ImGui::Button("Apply Layout")) {
@@ -1987,30 +2008,49 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			if (ImGui::Button(play ? "Stop" : "Start")) {
 				play = !play;
-				// スライド通り、再生を押した瞬間に上向き(0,1,0) m/s を与える
+
+				// 一様乱数 [-1, +1]
+				std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
 				for (uint32_t i = 0; i < kNumInstance; ++i) {
-					particles[i].velocity = { 0.0f, 1.0f, 0.0f };
+					// 基本の斜め配置 + ランダムゆらぎ
+					float jx = randPosRange * distribution(randomEngine);
+					float jy = randPosRange * distribution(randomEngine);
+					float jz = randPosRange * distribution(randomEngine);
+
+					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
+					particles[i].transform.rotate = { 0.0f, 0.0f, 0.0f };
+					particles[i].transform.translate = {
+						layoutStartX + layoutStepX * i + jx,
+						layoutStartY + layoutStepY * i + jy,
+						layoutStartZ + layoutStepZ * i + jz
+					};
+
+					// 速度はランダム（動画の “distribution(randomEngine)” のイメージ）
+					particles[i].velocity = {
+						randVelRange * distribution(randomEngine),
+						randVelRange * distribution(randomEngine),
+						randVelRange * randVelZScale * distribution(randomEngine)
+					};
 				}
 			}
+
 			ImGui::SameLine();
+
 			if (ImGui::Button("Reset")) {
-				const uint32_t kGridX = 5;
-				const uint32_t kGridY = 2;
-				const float spacing = 0.6f;
-				const float depthStep = 0.20f;
-
+				play = false; // 停止
 				for (uint32_t i = 0; i < kNumInstance; ++i) {
-					uint32_t x = i % kGridX;
-					uint32_t y = i / kGridX;
-					float fx = float(int(x) - int(kGridX - 1) / 2);
-					float fy = float(int(y) - int(kGridY - 1) / 2);
-
-					particles[i].transform.scale = { 1.0f, 1.0f, 1.0f };
+					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
 					particles[i].transform.rotate = { 0.0f, 0.0f, 0.0f };
-					particles[i].transform.translate = { -1.8f + 0.4f * i, -1.0f + 0.2f * i, 0.25f * i };
+					particles[i].transform.translate = {
+						layoutStartX + layoutStepX * i,
+						layoutStartY + layoutStepY * i,
+						layoutStartZ + layoutStepZ * i
+					};
 					particles[i].velocity = { 0.0f, 0.0f, 0.0f };
 				}
 			}
+
 			// --- Particle Layout UI ---
 			ImGui::SeparatorText("Particle Layout");
 			ImGui::DragFloat3("Start (X,Y,Z)", &layoutStartX, 0.01f, -3.0f, 3.0f);
