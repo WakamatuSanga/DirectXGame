@@ -16,6 +16,7 @@
 #include <strsafe.h>
 #include <vector>
 #include <random> 
+#include "Input.h"
 
 // --- Direct3D 12 / DXGI 関連 ---
 #include <d3d12.h>
@@ -121,13 +122,6 @@ struct ModelData {
 };
 
 // 変数//--------------------
-// --- DirectInput キーボード用 ---
-constexpr size_t kKeyCount = 256;          // キー配列サイズ（固定）
-IDirectInput8* g_di = nullptr;       // DirectInput 本体
-IDirectInputDevice8* g_keyboard = nullptr; // キーボードデバイス
-BYTE g_keyNow[kKeyCount] = {};            // 今フレームのキー状態
-BYTE g_keyPrev[kKeyCount] = {};            // 1フレーム前のキー状態
-
 // Lightingを有効にする
 //
 
@@ -967,60 +961,6 @@ GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap,
 	return handleGPU;
 }
 /////
-// --- DirectInput initialize/update/finalize ---
-
-// 初期化（一度だけ呼ぶ）
-void DirectInputInitialize(HWND hwnd, HINSTANCE hInst) {
-	// DirectInput8 の作成
-	HRESULT result = DirectInput8Create(
-		hInst, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&g_di, nullptr);
-	assert(SUCCEEDED(result));
-
-	// キーボードデバイスの作成
-	result = g_di->CreateDevice(GUID_SysKeyboard, &g_keyboard, nullptr);
-	assert(SUCCEEDED(result));
-
-	// データフォーマット（キーボード定義）を指定
-	result = g_keyboard->SetDataFormat(&c_dfDIKeyboard);
-	assert(SUCCEEDED(result));
-
-	// 協調レベル（フォアグラウンド・非排他・WinKey無効）を指定
-	result = g_keyboard->SetCooperativeLevel(
-		hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
-	assert(SUCCEEDED(result));
-}
-
-// 毎フレームの更新（入力状態の取得）
-void UpdateKeyboard() {
-	// 直前フレームの状態を保存
-	std::memcpy(g_keyPrev, g_keyNow, kKeyCount);
-
-	if (!g_keyboard) return;
-
-	// デバイスを取得して状態を読む
-	HRESULT result = g_keyboard->Acquire();
-	result = g_keyboard->GetDeviceState((DWORD)kKeyCount, g_keyNow);
-
-	// 取得に失敗したら配列をクリアして再取得を試みる
-	if (FAILED(result)) {
-		std::memset(g_keyNow, 0, kKeyCount);
-		g_keyboard->Acquire();
-	}
-}
-
-// ヘルパ（トリガ・状態判定）
-//  ※ DIK_0 など <dinput.h> のスキャンコードを渡す
-bool IsKeyDown(uint8_t key) { return (g_keyNow[key] & 0x80) != 0; } // 押下中
-bool IsKeyUp(uint8_t key) { return (g_keyNow[key] & 0x80) == 0; } // 離し中
-bool IsKeyPressed(uint8_t key) { return (g_keyNow[key] & 0x80) && !(g_keyPrev[key] & 0x80); } // 押した瞬間
-bool IsKeyReleased(uint8_t key) { return !(g_keyNow[key] & 0x80) && (g_keyPrev[key] & 0x80); } // 離した瞬間
-
-// 終了処理（解放）
-void DirectInputFinalize() {
-	if (g_keyboard) { g_keyboard->Unacquire(); g_keyboard->Release(); g_keyboard = nullptr; }
-	if (g_di) { g_di->Release();         g_di = nullptr; }
-}
-
 // main関数/////-------------------------------------------------------------------------------------------------
 //  Windwsアプリでの円とリポウント(main関数)
 
@@ -1097,8 +1037,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
 
-	// DirectInput 初期化
-	DirectInputInitialize(hwnd, wc.hInstance);
+	// Inputクラスの生成＆初期化
+	Input input;
+	input.Initialize(wc.hInstance, hwnd);
+
 
 	// DXGIファクトリーの生成
 	IDXGIFactory7* dxgiFactory = nullptr;
@@ -2026,10 +1968,57 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::NewFrame();
 			//
 			// 入力更新（毎フレーム）
-			UpdateKeyboard();
+			input.Update();
+
+			// ===== カメラ操作（WASD + 左クリック中にマウスドラッグで向き、WASDで移動）=====
+            // ImGuiがマウス入力を使っているときはカメラ操作を止める
+			const bool uiWantsMouse = ImGui::GetIO().WantCaptureMouse;
+
+			// --- 視点回転：左クリック押下中のみ ---
+			if (!uiWantsMouse && input.MouseDown(Input::MouseLeft)) {
+				const float sensitivity = 0.0025f;      // マウス感度（ラジアン/ピクセル）
+				cameraTransform.rotate.y -= input.MouseDeltaX() * sensitivity; // yaw（左右）
+				cameraTransform.rotate.x += input.MouseDeltaY() * sensitivity; // pitch（上下）
+
+				// ピッチを ±89° に制限（見上げ過ぎ/見下ろし過ぎ防止）
+				const float kPitchLimit = 1.55334306f;  // 89deg in rad
+				cameraTransform.rotate.x = std::clamp(cameraTransform.rotate.x, -kPitchLimit, kPitchLimit);
+			}
+
+			// --- 平行移動：左クリック押下中のみ（常時移動したいなら if(...) を外してね） ---
+			Vector3 move{ 0,0,0 };
+				if (input.PushKey(DIK_W)) move.z += 1.0f;  // 前
+				if (input.PushKey(DIK_S)) move.z -= 1.0f;  // 後
+				if (input.PushKey(DIK_D)) move.x += 1.0f;  // 右
+				if (input.PushKey(DIK_A)) move.x -= 1.0f;  // 左
+			
+
+			// 対角移動の速度を一定にする
+			if (float len = std::sqrt(move.x * move.x + move.z * move.z); len > 0.0f) {
+				move.x /= len; move.z /= len;
+			}
+
+			float speed = input.PushKey(DIK_LSHIFT) ? 6.0f : 2.5f; // Shiftでダッシュ
+			const float dt = 1.0f / 60.0f;
+
+			// Yaw（Y回転）を基準に、XZ平面で移動ベクトルを回す（左手系：+Zが前）
+			if (move.x != 0.0f || move.z != 0.0f) {
+				const float yaw = cameraTransform.rotate.y;
+				Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };   // 前
+				Vector3 right = { std::cos(yaw), 0.0f,-std::sin(yaw) };   // 右
+				Vector3 delta = {
+					right.x * move.x + forward.x * move.z,
+					0.0f,
+					right.z * move.x + forward.z * move.z
+				};
+				cameraTransform.translate.x += delta.x * speed * dt;
+				cameraTransform.translate.y += delta.y * speed * dt;
+				cameraTransform.translate.z += delta.z * speed * dt;
+			}
+
 
 			// ---- 使用例（必要なら）：数字0が押された瞬間のログ ----
-			if (IsKeyPressed(DIK_0)) {
+			if (input.TriggerKey(DIK_0)) {
 				OutputDebugStringA("Hit 0\n");
 			}
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをげ０無固有の処理を置き換える02_03
@@ -2462,9 +2451,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
-
-	// DirectInput 終了処理
-	DirectInputFinalize();
 
 	// === 解放処理 ===
 
