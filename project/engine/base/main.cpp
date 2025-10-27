@@ -3,6 +3,10 @@
 
 // --- Windows / 標準ライブラリ ---
 #include <Windows.h>
+// --- DirectInput（スライド：準備）---
+#define DIRECTINPUT_VERSION 0x0800   // ← dinput.h より前に必ず
+#include <dinput.h>
+#pragma comment(lib, "dinput8.lib")  // dxguid.lib は既に入っているのでOK
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -117,6 +121,13 @@ struct ModelData {
 };
 
 // 変数//--------------------
+// --- DirectInput キーボード用 ---
+constexpr size_t kKeyCount = 256;          // キー配列サイズ（固定）
+IDirectInput8* g_di = nullptr;       // DirectInput 本体
+IDirectInputDevice8* g_keyboard = nullptr; // キーボードデバイス
+BYTE g_keyNow[kKeyCount] = {};            // 今フレームのキー状態
+BYTE g_keyPrev[kKeyCount] = {};            // 1フレーム前のキー状態
+
 // Lightingを有効にする
 //
 
@@ -956,6 +967,60 @@ GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap,
 	return handleGPU;
 }
 /////
+// --- DirectInput initialize/update/finalize ---
+
+// 初期化（一度だけ呼ぶ）
+void DirectInputInitialize(HWND hwnd, HINSTANCE hInst) {
+	// DirectInput8 の作成
+	HRESULT result = DirectInput8Create(
+		hInst, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&g_di, nullptr);
+	assert(SUCCEEDED(result));
+
+	// キーボードデバイスの作成
+	result = g_di->CreateDevice(GUID_SysKeyboard, &g_keyboard, nullptr);
+	assert(SUCCEEDED(result));
+
+	// データフォーマット（キーボード定義）を指定
+	result = g_keyboard->SetDataFormat(&c_dfDIKeyboard);
+	assert(SUCCEEDED(result));
+
+	// 協調レベル（フォアグラウンド・非排他・WinKey無効）を指定
+	result = g_keyboard->SetCooperativeLevel(
+		hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	assert(SUCCEEDED(result));
+}
+
+// 毎フレームの更新（入力状態の取得）
+void UpdateKeyboard() {
+	// 直前フレームの状態を保存
+	std::memcpy(g_keyPrev, g_keyNow, kKeyCount);
+
+	if (!g_keyboard) return;
+
+	// デバイスを取得して状態を読む
+	HRESULT result = g_keyboard->Acquire();
+	result = g_keyboard->GetDeviceState((DWORD)kKeyCount, g_keyNow);
+
+	// 取得に失敗したら配列をクリアして再取得を試みる
+	if (FAILED(result)) {
+		std::memset(g_keyNow, 0, kKeyCount);
+		g_keyboard->Acquire();
+	}
+}
+
+// ヘルパ（トリガ・状態判定）
+//  ※ DIK_0 など <dinput.h> のスキャンコードを渡す
+bool IsKeyDown(uint8_t key) { return (g_keyNow[key] & 0x80) != 0; } // 押下中
+bool IsKeyUp(uint8_t key) { return (g_keyNow[key] & 0x80) == 0; } // 離し中
+bool IsKeyPressed(uint8_t key) { return (g_keyNow[key] & 0x80) && !(g_keyPrev[key] & 0x80); } // 押した瞬間
+bool IsKeyReleased(uint8_t key) { return !(g_keyNow[key] & 0x80) && (g_keyPrev[key] & 0x80); } // 離した瞬間
+
+// 終了処理（解放）
+void DirectInputFinalize() {
+	if (g_keyboard) { g_keyboard->Unacquire(); g_keyboard->Release(); g_keyboard = nullptr; }
+	if (g_di) { g_di->Release();         g_di = nullptr; }
+}
+
 // main関数/////-------------------------------------------------------------------------------------------------
 //  Windwsアプリでの円とリポウント(main関数)
 
@@ -1031,6 +1096,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
+
+	// DirectInput 初期化
+	DirectInputInitialize(hwnd, wc.hInstance);
 
 	// DXGIファクトリーの生成
 	IDXGIFactory7* dxgiFactory = nullptr;
@@ -1957,6 +2025,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 			//
+			// 入力更新（毎フレーム）
+			UpdateKeyboard();
+
+			// ---- 使用例（必要なら）：数字0が押された瞬間のログ ----
+			if (IsKeyPressed(DIK_0)) {
+				OutputDebugStringA("Hit 0\n");
+			}
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをげ０無固有の処理を置き換える02_03
 			ImGui::
 				ShowDemoWindow(); // ImGuiの始まりの場所-----------------------------
@@ -2387,6 +2462,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+
+	// DirectInput 終了処理
+	DirectInputFinalize();
 
 	// === 解放処理 ===
 
