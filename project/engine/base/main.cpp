@@ -16,6 +16,7 @@
 #include <strsafe.h>
 #include <vector>
 #include <random> 
+#include <algorithm>
 #include "Input.h"
 
 // --- Direct3D 12 / DXGI 関連 ---
@@ -80,6 +81,9 @@ struct Transform {
 struct Particle {
 	Transform transform;
 	Vector3   velocity;
+	Vector4   color;
+	float lifeTime;
+	float currentTime;
 };
 struct VertexData {
 	Vector4 position;
@@ -104,7 +108,11 @@ struct TransformationMatrix {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
 };
-
+struct ParticleForGPU {
+	Matrix4x4 WVP;
+	Matrix4x4 World;
+	Vector4   color;
+};
 struct DirectionalLight {
 	Vector4 color;
 	Vector3 direction;
@@ -1581,9 +1589,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//--------------------------
 	// WVPリソースを作る02_02
 	ID3D12Resource* wvpResource =
-		CreateBufferResource(device, sizeof(TransformationMatrix));
+		CreateBufferResource(device, sizeof(ParticleForGPU));
 	// データを書き込む02_02
-	TransformationMatrix* wvpData = nullptr;
+	ParticleForGPU* wvpData = nullptr;
 	// 書き込むためのアドレスを取得02_02
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	// 単位行列を書き込んでおく02_02
@@ -1676,9 +1684,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// sprite用のTransfomationMatrix用のリソースを作る。Matrix4x4
 	// 1つ分のサイズを用意する04_00
 	ID3D12Resource* transformationMatrixResourceSprite =
-		CreateBufferResource(device, sizeof(TransformationMatrix));
+		CreateBufferResource(device, sizeof(ParticleForGPU));
 	// sprite用のデータを書き込む04_00
-	TransformationMatrix* transformationMatrixDataSprite = nullptr;
+	ParticleForGPU* transformationMatrixDataSprite = nullptr;
 	// sprite用の書き込むためのアドレスを取得04_00
 	transformationMatrixResourceSprite->Map(
 		0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
@@ -1686,21 +1694,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// *transformationMatrixDataSprite = MakeIdentity4x4();
 
 	// ===== ここから追加：パーティクル用インスタンシング =====
-	const uint32_t kNumInstance = 10;   // ← 使う個数。描画/更新の両方で使うのでループより上に置く
+	const uint32_t kNumMaxInstance = 10;   // ← 使う個数。描画/更新の両方で使うのでループより上に置く
 
 	// バッファ本体
 	ID3D12Resource* instancingResource = nullptr;
 	// CPU側から書き込むための先頭ポインタ（Mapして保持）
-	TransformationMatrix* instancingData = nullptr;
+	ParticleForGPU* instancingData = nullptr;
 	// CPU側のパーティクル（描画は instancingData を使う）
-	Particle particles[kNumInstance];
+	Particle particles[kNumMaxInstance];
 
 	// 斜めスタック（5x2）にする
 	const uint32_t kGridX = 5;
 	const uint32_t kGridY = 2;
 	const float spacing = 0.2f;  // X・Y 間隔
 	const float depthStep = 0.20f; // 1枚ごとの奥行き
-	for (uint32_t i = 0; i < kNumInstance; ++i) {
+	for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 		uint32_t x = i % kGridX;
 		uint32_t y = i / kGridX;
 
@@ -1712,6 +1720,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		particles[i].transform.rotate = { 0.0f, 0.0f, 0.0f };
 		particles[i].transform.translate = { -1.8f + 0.4f * i, -1.0f + 0.2f * i, 0.25f * i };
 		particles[i].velocity = { 0.0f, 0.0f, 0.0f };
+		particles[i].color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	}
 
 
@@ -1721,13 +1730,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// インスタンシング用StructuredBuffer(TransformationMatrix配列)を生成
 	instancingResource =
-		CreateBufferResource(device, sizeof(TransformationMatrix) * kNumInstance);
+		CreateBufferResource(device, sizeof(ParticleForGPU) * kNumMaxInstance);
 
 	// 書き込み用にMapして、いったん単位行列で初期化
 	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
-	for (uint32_t i = 0; i < kNumInstance; ++i) {
+	for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 		instancingData[i].WVP = MakeIdentity4x4();
 		instancingData[i].World = MakeIdentity4x4();
+		instancingData[i].color = { 1,1,1,1 };
 	}
 
 	// SRV(StructuredBuffer)を作成（SRVヒープの index=3 を使用）
@@ -1736,8 +1746,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	instancingSrvDesc.Buffer.FirstElement = 0;
-	instancingSrvDesc.Buffer.NumElements = kNumInstance;
-	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	instancingSrvDesc.Buffer.NumElements = kNumMaxInstance;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleForGPU);
 	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 	instancingSrvCPU = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
@@ -1971,7 +1981,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			input.Update();
 
 			// ===== カメラ操作（WASD + 左クリック中にマウスドラッグで向き、WASDで移動）=====
-            // ImGuiがマウス入力を使っているときはカメラ操作を止める
+			// ImGuiがマウス入力を使っているときはカメラ操作を止める
 			const bool uiWantsMouse = ImGui::GetIO().WantCaptureMouse;
 
 			// --- 視点回転：左クリック押下中のみ ---
@@ -1987,11 +1997,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// --- 平行移動：左クリック押下中のみ（常時移動したいなら if(...) を外してね） ---
 			Vector3 move{ 0,0,0 };
-				if (input.PushKey(DIK_W)) move.z += 1.0f;  // 前
-				if (input.PushKey(DIK_S)) move.z -= 1.0f;  // 後
-				if (input.PushKey(DIK_D)) move.x += 1.0f;  // 右
-				if (input.PushKey(DIK_A)) move.x -= 1.0f;  // 左
-			
+			if (input.PushKey(DIK_W)) move.z += 1.0f;  // 前
+			if (input.PushKey(DIK_S)) move.z -= 1.0f;  // 後
+			if (input.PushKey(DIK_D)) move.x += 1.0f;  // 右
+			if (input.PushKey(DIK_A)) move.x -= 1.0f;  // 左
+
 
 			// 対角移動の速度を一定にする
 			if (float len = std::sqrt(move.x * move.x + move.z * move.z); len > 0.0f) {
@@ -2057,7 +2067,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// レイアウトを今すぐ反映（任意）
 			if (ImGui::Button("Apply Layout")) {
-				for (uint32_t i = 0; i < kNumInstance; ++i) {
+				for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 					particles[i].transform.translate = {
 						layoutStartX + layoutStepX * i,
 						layoutStartY + layoutStepY * i,
@@ -2073,11 +2083,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			if (ImGui::Button(play ? "Stop" : "Start")) {
 				play = !play;
 
-				// 一様乱数 [-1, +1]
 				std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+				std::uniform_real_distribution<float> dist01(0.0f, 1.0f);
 
-				for (uint32_t i = 0; i < kNumInstance; ++i) {
-					// 基本の斜め配置 + ランダムゆらぎ
+				// スライド：寿命は 1〜3 秒ランダム
+				std::uniform_real_distribution<float> lifeDist(1.0f, 3.0f);
+
+				for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
+					// 位置（レイアウト＋ゆらぎ）
 					float jx = randPosRange * distribution(randomEngine);
 					float jy = randPosRange * distribution(randomEngine);
 					float jz = randPosRange * distribution(randomEngine);
@@ -2090,20 +2103,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 						layoutStartZ + layoutStepZ * i + jz
 					};
 
-					// 速度はランダム（動画の “distribution(randomEngine)” のイメージ）
+					// 速度ランダム
 					particles[i].velocity = {
 						randVelRange * distribution(randomEngine),
 						randVelRange * distribution(randomEngine),
 						randVelRange * randVelZScale * distribution(randomEngine)
 					};
+
+					// 色ランダム（αはとりあえず1.0、描画時にフェード）
+					particles[i].color = { dist01(randomEngine), dist01(randomEngine),
+										   dist01(randomEngine), 1.0f };
+
+					// ★スライド：寿命と経過時間
+					particles[i].lifeTime = lifeDist(randomEngine);
+					particles[i].currentTime = 0.0f;
 				}
 			}
+
 
 			ImGui::SameLine();
 
 			if (ImGui::Button("Reset")) {
 				play = false; // 停止
-				for (uint32_t i = 0; i < kNumInstance; ++i) {
+				for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
 					particles[i].transform.rotate = { 0.0f, 0.0f, 0.0f };
 					particles[i].transform.translate = {
@@ -2112,6 +2134,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 						layoutStartZ + layoutStepZ * i
 					};
 					particles[i].velocity = { 0.0f, 0.0f, 0.0f };
+					particles[i].color = { 1,1,1,1 };
+					particles[i].currentTime = 0.0f;
+					particles[i].lifeTime = 1.0f; // とりあえず1秒で“生きてる”扱いに戻す
 				}
 			}
 
@@ -2125,7 +2150,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::Checkbox("Auto Apply (when not playing)", &autoApply);
 			if (ImGui::Button("Apply Layout")) {
 				// 速度はそのまま、位置とスケールだけ反映
-				for (uint32_t i = 0; i < kNumInstance; ++i) {
+				for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
 					particles[i].transform.translate = {
 						layoutStartX + layoutStepX * i,
@@ -2136,7 +2161,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			}
 			// 自動反映（再生中は上書きしない）
 			if (autoApply && !play) {
-				for (uint32_t i = 0; i < kNumInstance; ++i) {
+				for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 					particles[i].transform.scale = { spriteScaleXY, spriteScaleXY, 1.0f };
 					particles[i].transform.translate = {
 						layoutStartX + layoutStepX * i,
@@ -2209,8 +2234,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			wvpData->World = worldMatrix;
 			// ===== パーティクル（スプライト板ポリ）の行列更新 =====
 			const float kDeltaTime = 1.0f / 60.0f; // スライドの固定Δt
+			uint32_t numInstance = 0;
+			for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
 
-			for (uint32_t i = 0; i < kNumInstance; ++i) {
+				if (particles[i].lifeTime <= particles[i].currentTime) {
+					continue;
+				}
+
 				// 再生中だけ速度を位置に反映
 				if (play) {
 					particles[i].transform.translate.x += particles[i].velocity.x * kDeltaTime;
@@ -2226,6 +2256,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				Matrix4x4 wvp = Multiply(w, Multiply(viewMatrix, projectionMatrix));
 				instancingData[i].WVP = wvp;
 				instancingData[i].World = w;
+				instancingData[i].color = particles[i].color;
+
+				// ★“詰め替え”：生きている分だけ前詰めでGPUバッファへ
+					instancingData[numInstance].WVP = wvp;
+				instancingData[numInstance].World = w;
+				instancingData[numInstance].color = particles[i].color;
+				//instancingData[numInstance].color.w = alpha; // スライド：αを送る
+
+				++numInstance;
+
 			}
 
 
@@ -2373,8 +2413,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
 			// 6頂点の板ポリを kNumInstance 個ぶん描く
-			commandList->DrawIndexedInstanced(6, kNumInstance, 0, 0, 0);
-
+			commandList->DrawIndexedInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0, 0);
 			//// ===== インスタンシング用バッファ & SRV =====
 			//const uint32_t kNumInstance = 10;
 
