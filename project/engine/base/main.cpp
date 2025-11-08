@@ -978,6 +978,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	winApp = new WinApp();
 	winApp->Initialize();
 
+	// WinApp が作ったウィンドウを使う
+	HWND hwnd = winApp->GetHwnd();
+
+
 #ifdef _DEBUG
 
 	ID3D12Debug1* debugController = nullptr;
@@ -1907,13 +1911,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	MSG msg{};
 
 	// ウィンドウの×ボタンが押されるまでループ
-	while (msg.message != WM_QUIT) {
+	while (true) {
 
 		// Windowにメッセージが来てたら最優先で処理させる
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		} else {
+		// Windows のメッセージ処理（終了メッセージなら true）
+		if (winApp->ProcessMessage()) {
+			break;  // ゲームループを抜けて終了処理へ
+		}
 
 			// ここがframeの先頭02_03
 			ImGui_ImplDX12_NewFrame();
@@ -2396,7 +2400,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			assert(SUCCEEDED(hr));
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
-		}
+		
 	}
 
 	// ImGuiの終了処理。詳細はさして重要ではないので解説は省略する。
@@ -2495,6 +2499,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// WindowsAPI解放
 	delete winApp;
 	winApp = nullptr;
+	CoUninitialize();
+
 	// リソースチェックCG2_01_03
 	IDXGIDebug1* debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {

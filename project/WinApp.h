@@ -16,6 +16,7 @@ public:
 
     // 初期化 / 終了
     void Initialize();        // WindowsAPI の初期化
+    bool ProcessMessage();
     void Finalize();          // WindowsAPI の終了処理 ← 追加
 
     // getter

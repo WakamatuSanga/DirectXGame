@@ -59,13 +59,32 @@ void WinApp::Initialize() {
     ShowWindow(hwnd, SW_SHOW);
 }
 
+bool WinApp::ProcessMessage()
+{
+    MSG msg{};
+
+    // メッセージが来ていたら処理
+    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // アプリ終了メッセージかどうか
+    if (msg.message == WM_QUIT) {
+        return true;
+    }
+    return false;
+}
+
+
+
 // --------------------
 // 終了処理
 // --------------------
 void WinApp::Finalize() {
 
     if (hwnd) {
-        CloseWindow(hwnd); // もともと main.cpp の最後にあったやつ
+        //CloseWindow(hwnd); // もともと main.cpp の最後にあったやつ
         hwnd = nullptr;
     }
 
