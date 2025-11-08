@@ -27,7 +27,7 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     float32_t4 tex = gTexture.Sample(gSampler, uv);
 
-    output.color = gMaterial.color * tex;
+    output.color = gMaterial.color * tex * input.color;
 
     // 完全透明は捨てる（discard ではなく clip の方が確実）
     clip(output.color.a - 1e-6);
