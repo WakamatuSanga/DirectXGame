@@ -50,7 +50,7 @@
 
 
 // --- その他（必要ならアンコメント） ---
-// #include <format>  // C++20 の format 機能
+ #include <format>  // C++20 の format 機能
 
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd,
@@ -978,25 +978,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	winApp = new WinApp();
 	winApp->Initialize();
 
-	// ウィンドウサイズを表す構造体体にクライアント領域を入れる
-	RECT wrc = { 0, 0, WinApp::kClientWidth, WinApp::kClientHeight };
-
-	// クライアント領域をもとに実際のサイズにwrcを変更してもらう
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
-
-	// ウィンドウの生成
-	HWND hwnd = CreateWindow(wc.lpszClassName, // 利用するクラス名
-		L"CG2",           // タイトルバーの文字(何でもよい)
-		WS_OVERLAPPEDWINDOW,  // よく見るウィンドウスタイル
-		CW_USEDEFAULT,        // 表示X座標(Windowsに任せる)
-		CW_USEDEFAULT,        // 表示Y座標(WindowsOSに任せる)
-		wrc.right - wrc.left, // ウィンドウ横幅
-		wrc.bottom - wrc.top, // ウィンドウ縦幅
-		nullptr,              // 親ウィンドウハンドル
-		nullptr,              // メニューハンドル
-		wc.hInstance,         // インスタンスハンドル
-		nullptr);             // オプション
-
 #ifdef _DEBUG
 
 	ID3D12Debug1* debugController = nullptr;
@@ -1008,12 +989,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}
 #endif // _DEBUG
 
-	// ウィンドウを表示する
-	ShowWindow(hwnd, SW_SHOW);
 
 	// Inputクラスの生成＆初期化
 	Input input;
-	input.Initialize(winApp->GetHInstance(), winApp->GetHwnd());
+	input.Initialize(winApp);
 
 
 	// DXGIファクトリーの生成
@@ -1136,7 +1115,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		DXGI_SWAP_EFFECT_FLIP_DISCARD; // モニターに移したら,中身を吐き
 	// コマンドキュー,ウィンドウバンドル、設定を渡して生成する
 	hr = dxgiFactory->CreateSwapChainForHwnd(
-		commandQueue, hwnd, &swapChainDesc, nullptr, nullptr,
+		commandQueue, winApp->GetHwnd(), &swapChainDesc, nullptr, nullptr,
 		reinterpret_cast<IDXGISwapChain1**>(&swapChain));
 	assert(SUCCEEDED(hr));
 
@@ -1919,7 +1898,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsClassic();
-	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplWin32_Init(winApp->GetHwnd());
 	ImGui_ImplDX12_Init(device, swapChainDesc.BufferCount, rtvDesc.Format,
 		srvDescriptorHeap,
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -2508,11 +2487,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #ifdef _DEBUG
 	// --- デバッグレイヤー（DEBUG時のみ） ---
 	debugController->Release();
-
-	CoInitialize(nullptr);
 #endif
-	delete winApp;
 
+	// WindowsAPIの終了処理
+	winApp->Finalize();
+
+	// WindowsAPI解放
+	delete winApp;
+	winApp = nullptr;
 	// リソースチェックCG2_01_03
 	IDXGIDebug1* debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
