@@ -56,11 +56,14 @@ float Input::NormalizeAxis(LONG v)
 
 // ========== 初期化 ==========
 
-void Input::Initialize(HINSTANCE hInstance, HWND hwnd)
+void Input::Initialize(WinApp* winApp)
 {
+    assert(winApp);
+    winApp_ = winApp;
+
     // DirectInput インスタンス生成
     HRESULT hr = DirectInput8Create(
-        hInstance, DIRECTINPUT_VERSION,
+        winApp_->GetHInstance(), DIRECTINPUT_VERSION,
         IID_IDirectInput8,
         reinterpret_cast<void**>(directInput_.GetAddressOf()),
         nullptr);
@@ -69,38 +72,43 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd)
     // ------ キーボード ------
     hr = directInput_->CreateDevice(GUID_SysKeyboard, keyboard_.GetAddressOf(), nullptr);
     assert(SUCCEEDED(hr));
-    hr = keyboard_->SetDataFormat(&c_dfDIKeyboard);                                  // 固定フォーマット
+    hr = keyboard_->SetDataFormat(&c_dfDIKeyboard);
     assert(SUCCEEDED(hr));
-    hr = keyboard_->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+    hr = keyboard_->SetCooperativeLevel(
+        winApp_->GetHwnd(),
+        DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
     assert(SUCCEEDED(hr));
-    std::memset(key_, 0, sizeof(key_));
+    std::memset(key_,    0, sizeof(key_));
     std::memset(keyPre_, 0, sizeof(keyPre_));
 
     // ------ マウス ------
     hr = directInput_->CreateDevice(GUID_SysMouse, mouse_.GetAddressOf(), nullptr);
     assert(SUCCEEDED(hr));
-    hr = mouse_->SetDataFormat(&c_dfDIMouse2);                                       // 相対移動 + 8ボタン
+    hr = mouse_->SetDataFormat(&c_dfDIMouse2);
     assert(SUCCEEDED(hr));
-    hr = mouse_->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);   // 他アプリと共有
+    hr = mouse_->SetCooperativeLevel(
+        winApp_->GetHwnd(),
+        DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
     assert(SUCCEEDED(hr));
-    std::memset(&mouseNow_, 0, sizeof(mouseNow_));
+    std::memset(&mouseNow_,  0, sizeof(mouseNow_));
     std::memset(&mousePrev_, 0, sizeof(mousePrev_));
 
-    // ------ パッド（最初に見つかった 1 台） ------
-    gamepad_.Reset(); // 無い環境もあるので必ず null 許容
+    // ------ パッド ------
+    gamepad_.Reset();
     directInput_->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumGamepadCallback, this, DIEDFL_ATTACHEDONLY);
     if (gamepad_) {
-        hr = gamepad_->SetDataFormat(&c_dfDIJoystick2);                              // DIJOYSTATE2
+        hr = gamepad_->SetDataFormat(&c_dfDIJoystick2);
         assert(SUCCEEDED(hr));
-        hr = gamepad_->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+        hr = gamepad_->SetCooperativeLevel(
+            winApp_->GetHwnd(),
+            DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
         assert(SUCCEEDED(hr));
 
-        SetupPadAxisProperties();  // レンジ/デッドゾーン設定
-        std::memset(&padNow_, 0, sizeof(padNow_));
+        SetupPadAxisProperties();
+        std::memset(&padNow_,  0, sizeof(padNow_));
         std::memset(&padPrev_, 0, sizeof(padPrev_));
     }
 }
-
 // ========== 更新 ==========
 
 void Input::Update()

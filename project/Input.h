@@ -17,6 +17,7 @@
 // dinput.h の前にバージョン定義が必要
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
+#include "WinApp.h"
 
 // ------------------------------------------------------------
 // 入力クラス
@@ -38,7 +39,7 @@ public:
 
 public:
     // 初期化：アプリケーションインスタンスとウィンドウハンドルを受け取る
-    void Initialize(HINSTANCE hInstance, HWND hwnd);
+    void Initialize(WinApp* winApp);
 
     // 毎フレーム更新：全デバイスの状態を取得
     void Update();
@@ -83,6 +84,9 @@ private:
     static float NormalizeAxis(LONG v); // [-1000,+1000] → [-1,+1]
 
 private:
+
+    WinApp* winApp_ = nullptr;
+
     // --- DirectInput 本体 ---
     ComPtr<IDirectInput8> directInput_;
 
