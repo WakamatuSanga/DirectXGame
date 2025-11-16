@@ -9,6 +9,9 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <chrono>
+#include <thread>
+#include <cstdint>
 
 #include "WinApp.h"
 #include "externals/DirectXTex/DirectXTex.h" // TexMetadata / ScratchImage 用
@@ -113,6 +116,14 @@ private:
         const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
         uint32_t descriptorSize,
         uint32_t index);
+
+    // FPS固定初期化
+    void InitializeFixFPS();
+    // FPS固定更新
+    void UpdateFixFPS();
+
+    // 記録時間（FPS固定用）
+    std::chrono::steady_clock::time_point reference_;
 
 private:
     // WindowsAPI
