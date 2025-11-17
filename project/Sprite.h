@@ -1,35 +1,39 @@
 #pragma once
-#include <cstdint>
-#include <d3d12.h>
-#include <wrl.h>
-
-#include "Matrix4x4.h"   // ★ここを追加（Vector/Matrix/Transform用）
 
 class SpriteCommon;
 
 // スプライト1枚分
 class Sprite {
 public:
+    // 初期化（SpriteCommon を受け取る）
     void Initialize(SpriteCommon* spriteCommon);
+
+    // 必要になったら使う
     void Update();
     void Draw();
 
-    // 位置・スケールを外から変えたいとき用（必要になったら使う）
-    void SetPosition(float x, float y) {
-        transform_.translate.x = x;
-        transform_.translate.y = y;
-    }
-    void SetScale(float sx, float sy) {
-        transform_.scale.x = sx;
-        transform_.scale.y = sy;
-    }
+    //=====================
+    //  setter / getter
+    //=====================
 
-    // main 側で作ったテクスチャ SRV を渡す用
-    void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) {
-        textureSrvHandleGPU_ = handle;
-    }
+    // 座標
+    const Vector2& GetPosition() const { return position_; }
+    void SetPosition(const Vector2& position) { position_ = position; }
+
+    // 回転(Z軸, radian)
+    float GetRotation() const { return rotation_; }
+    void SetRotation(float rotation) { rotation_ = rotation; }
+
+    // サイズ（ピクセル）
+    const Vector2& GetSize() const { return size_; }
+    void SetSize(const Vector2& size) { size_ = size; }
+
+    // 色（material の color をそのまま返す）
+    const Vector4& GetColor() const { return materialData_->color; }
+    void SetColor(const Vector4& color) { materialData_->color = color; }
 
 private:
+    // 共通部へのポインタ
     SpriteCommon* spriteCommon_ = nullptr;
 
     struct VertexData {
@@ -40,6 +44,7 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
     Microsoft::WRL::ComPtr<ID3D12Resource> indexResource_;
+
     VertexData* vertexData_ = nullptr;
     uint32_t* indexData_ = nullptr;
 
@@ -47,11 +52,12 @@ private:
     D3D12_INDEX_BUFFER_VIEW  indexBufferView_{};
 
     struct Material {
-        Vector4   color;
-        int32_t   enableLighting;
-        float     padding[3];
+        Vector4 color;
+        int32_t enableLighting;
+        float   padding[3];
         Matrix4x4 uvTransform;
     };
+
     Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
     Material* materialData_ = nullptr;
 
@@ -59,13 +65,14 @@ private:
         Matrix4x4 WVP;
         Matrix4x4 World;
     };
+
     Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_;
     TransformationMatrix* transformationMatrixData_ = nullptr;
 
-    Transform transform_
-    { {1.0f,1.0f,1.0f},
-      {0.0f,0.0f,0.0f},
-      {0.0f,0.0f,0.0f} };
+    Transform transform_;
 
-    D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU_{};  // t0
+    // ─ Sprite ごとのパラメータ ─
+    Vector2 position_ = { 0.0f, 0.0f };
+    Vector2 size_ = { 640.0f, 360.0f };
+    float   rotation_ = 0.0f;
 };
