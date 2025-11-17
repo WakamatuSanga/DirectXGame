@@ -21,6 +21,8 @@
 #include "DirectXCommon.h"
 #include <cmath>
 #include <algorithm>
+#include "SpriteCommon.h"
+#include "Sprite.h"
 
 // --- Direct3D 12 / DXGI 関連 ---
 #include <d3d12.h>
@@ -966,7 +968,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     std::string dateString = std::format("{:%Y%m%d_%H%M%S}", loacalTime);
     std::string logFilePath = std::string("logs/") + dateString + ".log";
     std::ofstream logStream(logFilePath);
-
+#pragma region 基盤システムの初期化
     // WinApp の初期化
     WinApp* winApp = new WinApp();
     winApp->Initialize();
@@ -974,6 +976,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // DirectXCommon の初期化（デバイス・スワップチェーン・RTV/DSV・ImGui 初期化など）
     DirectXCommon* dxCommon = new DirectXCommon();
     dxCommon->Initialize(winApp);
+
+    // ★スプライト共通部の初期化
+    SpriteCommon* spriteCommon = new SpriteCommon();
+    spriteCommon->Initialize(dxCommon);
 
     // DirectX リソース取得（DirectXCommon から借りる）
     ID3D12Device* device = dxCommon->GetDevice();
@@ -986,6 +992,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Input input;
     input.Initialize(winApp);
 
+    Sprite* sprite = new Sprite();
+    sprite->Initialize(spriteCommon);
+
+#pragma endregion
     // ★ SRV ヒープは DirectXCommon が持っているものを借りる前提
     //    ※ DirectXCommon に GetSrvDescriptorHeap() がない場合は追加してください
     ID3D12DescriptorHeap* srvDescriptorHeap = dxCommon->GetSrvDescriptorHeap();
