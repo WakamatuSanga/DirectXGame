@@ -23,6 +23,7 @@
 #include <algorithm>
 #include "SpriteCommon.h"
 #include "Sprite.h"
+#include "Matrix4x4.h"
 
 // --- Direct3D 12 / DXGI 関連 ---
 #include <d3d12.h>
@@ -62,26 +63,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd,
 	UINT msg,
 	WPARAM wParam,
 	LPARAM lParam);
-struct Vector2 {
-	float x, y;
-};
-
-struct Vector4 {
-	float x, y, z, w;
-};
-struct Vector3 {
-	float x, y, z;
-};
-struct Matrix4x4 {
-	float m[4][4];
-};
 struct Matrix3x3 {
 	float m[3][3];
-};
-struct Transform {
-	Vector3 scale;
-	Vector3 rotate;
-	Vector3 translate;
 };
 struct Particle {
 	Transform transform;
