@@ -1,18 +1,30 @@
+// SpriteCommon.h
 #pragma once
+#include "DirectXCommon.h"
 
-// 前方宣言
-class DirectXCommon;
-
-// スプライト共通部
 class SpriteCommon {
 public:
     // 初期化
     void Initialize(DirectXCommon* dxCommon);
 
-    // DirectXCommon を貸し出す getter
-    DirectXCommon* GetDirectXCommon() const { return dxCommon_; }
+    // getter（スライド「getter」）
+    DirectXCommon* GetDxCommon() const { return dxCommon_; }
+
+    // 共通描画設定（スライド「共通描画設定」）
+    void CommonDrawSetting();
 
 private:
-    // DirectXCommon のインスタンスを保持しておく
+    // スライド「処理を関数にまとめる」
+    // ルートシグネチャの作成
+    void CreateRootSignature();
+    // グラフィックスパイプラインの生成
+    void CreateGraphicsPipelineState();
+
+private:
+    // DirectXCommon のポインタ（スライド「DirectXCommonのポインタ」）
     DirectXCommon* dxCommon_ = nullptr;
+
+    // Sprite 用のルートシグネチャ & パイプラインステート
+    ID3D12RootSignature* rootSignature_ = nullptr;
+    ID3D12PipelineState* pipelineState_ = nullptr;
 };
