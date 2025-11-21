@@ -30,6 +30,9 @@ public:
     void PreDraw();
     void PostDraw();
 
+    // 最大SRV数（最大テクスチャ枚数）
+    static const uint32_t kMaxSRVCount;
+
     // --- getter（スライド通り＋少し追加） ---
     ID3D12Device* GetDevice() const { return device.Get(); }
     ID3D12GraphicsCommandList* GetCommandList() const { return commandList.Get(); }
@@ -67,7 +70,7 @@ public:
         const DirectX::TexMetadata& metadata);
 
     /// <summary>テクスチャデータの転送（ScratchImage → GPU）</summary>
-    void UploadTextureData(
+    Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(
         const Microsoft::WRL::ComPtr<ID3D12Resource>& texture,
         const DirectX::ScratchImage& mipImages);
 

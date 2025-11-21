@@ -372,6 +372,8 @@ void DirectXCommon::CreateDepthBuffer()
         WinApp::kClientHeight);
 }
 
+const uint32_t DirectXCommon::kMaxSRVCount = 512;
+
 // --------------------
 // 各種デスクリプタヒープ生成
 // --------------------
@@ -668,7 +670,7 @@ ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(
 }
 
 // テクスチャデータ転送
-void DirectXCommon::UploadTextureData(
+ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(
     const ComPtr<ID3D12Resource>& texture,
     const DirectX::ScratchImage& mipImages)
 {
@@ -710,6 +712,8 @@ void DirectXCommon::UploadTextureData(
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
+
+    return intermediate;
 }
 
 // テクスチャファイル読み込み（static）

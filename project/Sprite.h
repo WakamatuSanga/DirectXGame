@@ -1,6 +1,7 @@
 #pragma once
-
-class SpriteCommon;
+#include "Matrix4x4.h"
+#include <Windows.h>
+#include "SpriteCommon.h"
 
 // スプライト1枚分
 class Sprite {
@@ -31,6 +32,15 @@ public:
     // 色（material の color をそのまま返す）
     const Vector4& GetColor() const { return materialData_->color; }
     void SetColor(const Vector4& color) { materialData_->color = color; }
+
+    // --- テクスチャ関連 ---
+
+   // ファイルパス指定でテクスチャをセット
+    void SetTexture(const std::string& filePath);
+
+    // すでに TextureManager に登録済みのインデックスを直接セット
+    void SetTextureIndex(uint32_t textureIndex) { textureIndex_ = textureIndex; }
+    uint32_t GetTextureIndex() const { return textureIndex_; }
 
 private:
     // 共通部へのポインタ
@@ -75,4 +85,6 @@ private:
     Vector2 position_ = { 0.0f, 0.0f };
     Vector2 size_ = { 640.0f, 360.0f };
     float   rotation_ = 0.0f;
+
+    uint32_t textureIndex_ = 0;
 };
