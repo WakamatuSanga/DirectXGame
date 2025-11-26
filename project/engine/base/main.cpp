@@ -1043,6 +1043,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         ImGui::Begin("Material / Particle / Texture");
 
+        ImGui::SeparatorText("cameraKey WASD Mouse");
         ImGui::SeparatorText("Model Transform");
         ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 5.0f);
         ImGui::SliderAngle("RotateX", &transform.rotate.x, -180.0f, 180.0f);
