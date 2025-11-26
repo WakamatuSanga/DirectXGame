@@ -999,7 +999,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         const bool uiWantsMouse = ImGui::GetIO().WantCaptureMouse;
         if (!uiWantsMouse && input.MouseDown(Input::MouseLeft)) {
             const float sensitivity = 0.0025f;
-            cameraTransform.rotate.y -= input.MouseDeltaX() * sensitivity;
+            cameraTransform.rotate.y += input.MouseDeltaX() * sensitivity;
             cameraTransform.rotate.x += input.MouseDeltaY() * sensitivity;
             const float kPitchLimit = 1.55334306f;
             cameraTransform.rotate.x =
@@ -1177,9 +1177,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         directionalLightData->direction =
             Normalize(directionalLightData->direction);
 
+        // ==== UV行列の更新（スプライトの切り取り用）====
+        {
+            // ImGui からいじっている uvTransformSprite を 4x4 行列に変換
+            Vector3 uvScale = { uvTransformSprite.scale.x,  uvTransformSprite.scale.y,  1.0f };
+            Vector3 uvRotate = { 0.0f, 0.0f, uvTransformSprite.rotate.z };
+            Vector3 uvTrans = { uvTransformSprite.translate.x, uvTransformSprite.translate.y, 0.0f };
+
+            // UV 変換用のアフィン行列を作ってマテリアルに書き戻す
+            materialDataSprite->uvTransform = MakeAffine(uvScale, uvRotate, uvTrans);
+        }
+
         // ==== 行列計算 ====
         Matrix4x4 worldMatrix =
             MakeAffine(transform.scale, transform.rotate, transform.translate);
+
         Matrix4x4 cameraMatrix =
             MakeAffine(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
         Matrix4x4 viewMatrix = Inverse(cameraMatrix);
@@ -1263,7 +1275,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             0, materialResourceSprite->GetGPUVirtualAddress());
         commandList->SetGraphicsRootDescriptorTable(1, instancingSrvGPU);
 
-        // スプライトには uvChecker を貼る例
+        // スプライトには uvChecker を貼る
         D3D12_GPU_DESCRIPTOR_HANDLE spriteTexHandle =
             texManager->GetSrvHandleGPU(texIndexUvChecker);
         commandList->SetGraphicsRootDescriptorTable(2, spriteTexHandle);
