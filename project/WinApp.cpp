@@ -45,7 +45,7 @@ void WinApp::Initialize() {
     // ウィンドウ生成
     hwnd = CreateWindow(
         wc.lpszClassName,
-        L"CG2",
+        L"LE2C_26_ワカマツ_サンガ",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         wrc.right - wrc.left,
