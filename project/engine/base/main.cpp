@@ -1229,42 +1229,42 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         commandList->SetDescriptorHeaps(1, heaps);
 
         // --- 3D モデル描画 ---
-        //commandList->SetGraphicsRootSignature(rootSignature);
-        //commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        commandList->SetGraphicsRootSignature(rootSignature);
+        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        //// マテリアル CBV
-        //commandList->SetGraphicsRootConstantBufferView(
-        //    0, materialResource->GetGPUVirtualAddress());
-        //// WVP CBV
-        //wvpData->WVP = worldViewProjectionMatrix;
-        //wvpData->World = worldMatrix;
-        //commandList->SetGraphicsRootConstantBufferView(
-        //    1, wvpResource->GetGPUVirtualAddress());
-        //// ライト CBV
-        //commandList->SetGraphicsRootConstantBufferView(
-        //    3, directionalLightResource->GetGPUVirtualAddress());
+        // マテリアル CBV
+        commandList->SetGraphicsRootConstantBufferView(
+            0, materialResource->GetGPUVirtualAddress());
+        // WVP CBV
+        wvpData->WVP = worldViewProjectionMatrix;
+        wvpData->World = worldMatrix;
+        commandList->SetGraphicsRootConstantBufferView(
+            1, wvpResource->GetGPUVirtualAddress());
+        // ライト CBV
+        commandList->SetGraphicsRootConstantBufferView(
+            3, directionalLightResource->GetGPUVirtualAddress());
 
-        //switch (currentBlendMode) {
-        //case 0: commandList->SetPipelineState(psoNormal);   break;
-        //case 1: commandList->SetPipelineState(psoAdd);      break;
-        //case 2: commandList->SetPipelineState(psoSubtract); break;
-        //case 3: commandList->SetPipelineState(psoMultiply); break;
-        //case 4: commandList->SetPipelineState(psoScreen);   break;
-        //case 5: commandList->SetPipelineState(psoNone);     break;
-        //default: commandList->SetPipelineState(psoNormal);  break;
-        //}
+        switch (currentBlendMode) {
+        case 0: commandList->SetPipelineState(psoNormal);   break;
+        case 1: commandList->SetPipelineState(psoAdd);      break;
+        case 2: commandList->SetPipelineState(psoSubtract); break;
+        case 3: commandList->SetPipelineState(psoMultiply); break;
+        case 4: commandList->SetPipelineState(psoScreen);   break;
+        case 5: commandList->SetPipelineState(psoNone);     break;
+        default: commandList->SetPipelineState(psoNormal);  break;
+        }
 
-        //commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+        commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
-        //// 使用テクスチャを TextureManager から取得
-        //uint32_t useTexIndex =
-        //    (currentModelTexture == 0) ? texIndexUvChecker : texIndexFence;
-        //D3D12_GPU_DESCRIPTOR_HANDLE modelTexHandle =
-        //    texManager->GetSrvHandleGPU(useTexIndex);
-        //commandList->SetGraphicsRootDescriptorTable(2, modelTexHandle);
+        // 使用テクスチャを TextureManager から取得
+        uint32_t useTexIndex =
+            (currentModelTexture == 0) ? texIndexUvChecker : texIndexFence;
+        D3D12_GPU_DESCRIPTOR_HANDLE modelTexHandle =
+            texManager->GetSrvHandleGPU(useTexIndex);
+        commandList->SetGraphicsRootDescriptorTable(2, modelTexHandle);
 
-        //commandList->DrawInstanced(
-        //    UINT(modelData.vertices.size()), 1, 0, 0);
+        commandList->DrawInstanced(
+            UINT(modelData.vertices.size()), 1, 0, 0);
 
         // --- パーティクルスプライト描画 ---
         commandList->SetGraphicsRootSignature(spriteRootSignature);
