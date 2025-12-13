@@ -15,7 +15,6 @@ struct Vector4 {
     float x, y, z, w;
 };
 
-
 // 4x4行列
 struct Matrix4x4 {
     float m[4][4];
