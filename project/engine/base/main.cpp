@@ -57,6 +57,8 @@
 #include "Logger.h"
 #include "StringUtility.h"
 #include "TextureManager.h"
+#include "ModelCommon.h"
+#include "Model.h"
 
 // ------------- 型定義 / 構造体など -------------
 
@@ -427,6 +429,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Object3dCommon* object3dCommon = new Object3dCommon();
     object3dCommon->Initialize(dxCommon);
 
+    // ModelCommon初期化
+    ModelCommon* modelCommon = new ModelCommon();
+    modelCommon->Initialize(dxCommon);
+
+    // Model生成・初期化
+    Model* model = new Model();
+    model->Initialize(modelCommon, "resources/obj/fence", "fence.obj");
+
     // TextureManager
     TextureManager* texManager = TextureManager::GetInstance();
     texManager->Initialize(dxCommon);
@@ -447,6 +457,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 3Dオブジェクト単体の初期化
     Object3d* object3d = new Object3d();
     object3d->Initialize(object3dCommon);
+
+    // Modelをセット
+    object3d->SetModel(model);
+
 #pragma endregion
 
     // ===== DXC 初期化 =====
@@ -1342,6 +1356,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     dxCommon->Finalize();
     winApp->Finalize();
 
+    // ==== 後始末 ====
+    delete model;
+    delete modelCommon;
     delete object3d;
     delete object3dCommon;
     delete sprite;
