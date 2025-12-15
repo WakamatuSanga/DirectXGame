@@ -51,6 +51,8 @@
 #include "DirectXCommon.h"
 #include "SpriteCommon.h"
 #include "Sprite.h"
+#include "Object3dCommon.h"
+#include "Object3d.h"
 #include "Matrix4x4.h"
 #include "Logger.h"
 #include "StringUtility.h"
@@ -421,6 +423,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     SpriteCommon* spriteCommon = new SpriteCommon();
     spriteCommon->Initialize(dxCommon);
 
+    // 3Dオブジェクト共通部の初期化
+    Object3dCommon* object3dCommon = new Object3dCommon();
+    object3dCommon->Initialize(dxCommon);
+
     // TextureManager
     TextureManager* texManager = TextureManager::GetInstance();
     texManager->Initialize(dxCommon);
@@ -437,6 +443,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 仮：Spriteインスタンス（後で使う前提）
     Sprite* sprite = new Sprite();
     sprite->Initialize(spriteCommon);
+
+    // 3Dオブジェクト単体の初期化
+    Object3d* object3d = new Object3d();
+    object3d->Initialize(object3dCommon);
 #pragma endregion
 
     // ===== DXC 初期化 =====
@@ -1228,6 +1238,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         ID3D12DescriptorHeap* heaps[] = { srvDescriptorHeap };
         commandList->SetDescriptorHeaps(1, heaps);
 
+        // 3Dオブジェクトの共通設定
+        object3dCommon->CommonDrawSetting();
+
         // --- 3D モデル描画 ---
         commandList->SetGraphicsRootSignature(rootSignature);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1329,6 +1342,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     dxCommon->Finalize();
     winApp->Finalize();
 
+    delete object3d;
+    delete object3dCommon;
     delete sprite;
     delete spriteCommon;
     delete dxCommon;

@@ -160,6 +160,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\math\Matrix4x4.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="Object3d.cpp" />
+    <ClCompile Include="Object3dCommon.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="SpriteCommon.cpp" />
     <ClCompile Include="StringUtility.cpp" />
@@ -180,6 +182,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\math\Matrix4x4.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="Object3d.h" />
+    <ClInclude Include="Object3dCommon.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="SpriteCommon.h" />
     <ClInclude Include="StringUtility.h" />
