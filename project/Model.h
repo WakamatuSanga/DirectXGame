@@ -7,7 +7,7 @@
 #include <d3d12.h>
 
 class Model {
-public: // 構造体定義 (Object3dから移動)
+public:
     struct VertexData {
         Vector4 position;
         Vector2 texcoord;
@@ -37,6 +37,12 @@ public: // メンバ関数
 
     // 描画
     void Draw();
+
+    // ★ImGui用：マテリアルデータをいじれるようにする
+    Material* GetMaterialData() { return materialData_; }
+
+    // ★ImGui用：テクスチャを差し替えられるようにする
+    void SetTextureIndex(uint32_t index) { modelData_.material.textureIndex = index; }
 
     // .mtlファイルの読み取り (静的関数)
     static MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);

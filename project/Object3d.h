@@ -32,8 +32,14 @@ public: // メンバ関数
     void SetScale(const Vector3& scale) { transform_.scale = scale; }
     void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
     void SetTranslate(const Vector3& translate) { transform_.translate = translate; }
-    const Transform& GetTransform() const { return transform_; }
+
+    // ImGui等から直接いじれるように非const参照を返す
+    Transform& GetTransform() { return transform_; }
+
     void SetCameraTransform(const Transform& cameraTransform) { cameraTransform_ = cameraTransform; }
+
+    // ★ImGui用：ライトのデータを直接変更できるようにする
+    DirectionalLight* GetDirectionalLightData() { return directionalLightData_; }
 
 private:
     void CreateTransformationMatrixResource();
@@ -41,10 +47,10 @@ private:
 
 private:
     Object3dCommon* object3dCommon_ = nullptr;
-    Model* model_ = nullptr; // ★Modelへのポインタ
+    Model* model_ = nullptr;
 
-    Transform transform_;
-    Transform cameraTransform_;
+    Transform transform_{ {1,1,1}, {0,0,0}, {0,0,0} };
+    Transform cameraTransform_{ {1,1,1}, {0,0,0}, {0,0,-5} };
 
     // 座標変換行列リソース
     Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_;
