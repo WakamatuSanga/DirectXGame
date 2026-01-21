@@ -12,18 +12,19 @@ void Object3d::Initialize(Object3dCommon* object3dCommon) {
 
     CreateTransformationMatrixResource();
     CreateDirectionalLightResource();
+    CreateCameraResource(); // ★追加
 }
 
 void Object3d::Update() {
-    // 行列計算
     Matrix4x4 worldMatrix = MakeAffine(transform_.scale, transform_.rotate, transform_.translate);
 
-    // カメラがあればビュープロジェクションを使う
     if (camera_) {
         const Matrix4x4& viewProjection = camera_->GetViewProjectionMatrix();
         transformationMatrixData_->WVP = Multipty(worldMatrix, viewProjection);
+
+        // ★追加: カメラ座標をGPUへ送る
+        cameraData_->worldPosition = camera_->GetTranslate();
     } else {
-        // カメラ未セット時は単位行列等で代用（またはエラー）
         transformationMatrixData_->WVP = worldMatrix;
     }
 
@@ -35,9 +36,13 @@ void Object3d::Draw() {
 
     commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
+    // ★追加: Camera用CBV (b2)
+    commandList->SetGraphicsRootConstantBufferView(4, cameraResource_->GetGPUVirtualAddress());
 
     if (model_) {
         model_->Draw();
+    } else if (sphere_) {
+        sphere_->Draw();
     }
 }
 
@@ -54,4 +59,13 @@ void Object3d::CreateDirectionalLightResource() {
     directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
     directionalLightData_->intensity = 1.0f;
+}
+
+// ★追加
+void Object3d::CreateCameraResource() {
+    // 256バイトアライメント
+    size_t sizeInBytes = (sizeof(CameraForGPU) + 255) & ~255;
+    cameraResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeInBytes);
+    cameraResource_->Map(0, nullptr, reinterpret_cast<void**>(&cameraData_));
+    cameraData_->worldPosition = { 0.0f, 0.0f, 0.0f };
 }

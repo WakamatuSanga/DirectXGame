@@ -31,19 +31,20 @@ void Object3dCommon::CreateRootSignature()
     staticSamplers[0].ShaderRegister = 0;
     staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    D3D12_ROOT_PARAMETER rootParameters[4]{};
+    // ルートパラメータの設定 (5つ)
+    D3D12_ROOT_PARAMETER rootParameters[5]{};
 
-    // [0] Pixel CBV : Material(b0)
+    // [0] Pixel CBV : Material (b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[0].Descriptor.ShaderRegister = 0;
 
-    // [1] Vertex CBV : TransformationMatrix(b0)
+    // [1] Vertex CBV : TransformationMatrix (b0)
     rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
     rootParameters[1].Descriptor.ShaderRegister = 0;
 
-    // [2] Pixel SRV : Texture(t0)
+    // [2] Pixel DescriptorTable : Texture (t0)
     D3D12_DESCRIPTOR_RANGE descriptorRange[1]{};
     descriptorRange[0].BaseShaderRegister = 0;
     descriptorRange[0].NumDescriptors = 1;
@@ -54,10 +55,15 @@ void Object3dCommon::CreateRootSignature()
     rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
     rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
 
-    // [3] Pixel CBV : DirectionalLight(b1)
+    // [3] Pixel CBV : DirectionalLight (b1)
     rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[3].Descriptor.ShaderRegister = 1;
+
+    // [4] Pixel CBV : Camera (b2)
+    rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[4].Descriptor.ShaderRegister = 2;
 
     descriptionRootSignature.pParameters = rootParameters;
     descriptionRootSignature.NumParameters = _countof(rootParameters);
@@ -88,10 +94,10 @@ void Object3dCommon::CreateGraphicsPipelineStates()
 {
     HRESULT hr = S_OK;
 
-    // RootSignature生成
+    // ルートシグネチャ生成
     CreateRootSignature();
 
-    // シェーダーコンパイル
+    // シェーダーのコンパイル
     auto vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Object3d.VS.hlsl", L"vs_6_0");
     auto pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Object3d.PS.hlsl", L"ps_6_0");
 
@@ -116,9 +122,9 @@ void Object3dCommon::CreateGraphicsPipelineStates()
     inputLayoutDesc.pInputElementDescs = inputElementDescs;
     inputLayoutDesc.NumElements = _countof(inputElementDescs);
 
-    // Rasterizer (★ここを NONE にしないと、裏面や板ポリが消えることがあります)
+    // Rasterizer
     D3D12_RASTERIZER_DESC rasterizerDesc{};
-    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE; // カリングなしに変更
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
     rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
     // DepthStencil
@@ -127,7 +133,7 @@ void Object3dCommon::CreateGraphicsPipelineStates()
     depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
-    // PSO ベース設定
+    // PSO Desc
     D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc{};
     graphicsPipelineStateDesc.pRootSignature = rootSignature_.Get();
     graphicsPipelineStateDesc.InputLayout = inputLayoutDesc;
@@ -142,10 +148,9 @@ void Object3dCommon::CreateGraphicsPipelineStates()
     graphicsPipelineStateDesc.SampleDesc.Count = 1;
     graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
-    // --- 各ブレンドモードの生成 ---
     graphicsPipelineStates_.resize((size_t)BlendMode::kCountOf);
 
-    // Helper lambda
+    // PSO生成ヘルパー
     auto CreatePSO = [&](BlendMode mode, const D3D12_BLEND_DESC& blendDesc) {
         graphicsPipelineStateDesc.BlendState = blendDesc;
         hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
@@ -228,12 +233,11 @@ void Object3dCommon::CreateGraphicsPipelineStates()
     }
 }
 
+// ★ここが原因でした。引数付きの関数実装が必要です。
 void Object3dCommon::CommonDrawSetting(BlendMode blendMode)
 {
-    // ルートシグネチャをセット
     dxCommon_->GetCommandList()->SetGraphicsRootSignature(rootSignature_.Get());
     // 指定されたブレンドモードのPSOをセット
     dxCommon_->GetCommandList()->SetPipelineState(graphicsPipelineStates_[(size_t)blendMode].Get());
-    // プリミティブトポロジーをセット
     dxCommon_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }

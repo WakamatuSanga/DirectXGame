@@ -12,6 +12,7 @@
 #include "Model.h"
 #include "Camera.h"
 #include "ParticleManager.h"
+#include "Sphere.h" // ★必須: Sphereヘッダ
 #include "Input.h"
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -55,21 +56,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ParticleManager* particleManager = ParticleManager::GetInstance();
     particleManager->Initialize(dxCommon, srvManager);
 
-    // --- モデルロード ---
+    // --- モデルロード (Fence) ---
     modelManager->LoadModel("resources/obj/fence/fence.obj");
     Model* modelFence = modelManager->FindModel("resources/obj/fence/fence.obj");
 
+    // --- スフィア生成 (★ここが消えていました) ---
+    Sphere* sphere = new Sphere();
+    sphere->Initialize(dxCommon);
+    // sphere->SetTexture("resources/monsterBall.png"); // 必要ならテクスチャ設定
+
     // --- カメラ生成 ---
     Camera* camera = new Camera();
-    camera->SetTranslate({ 0.0f, 4.0f, -10.0f });
-    camera->SetRotate({ 0.3f, 0.0f, 0.0f });
+    camera->SetTranslate({ 0.0f, 2.0f, -10.0f });
+    camera->SetRotate({ 0.1f, 0.0f, 0.0f });
 
-    // --- 3Dオブジェクト生成 ---
-    Object3d* object3d = new Object3d();
-    object3d->Initialize(object3dCommon);
-    object3d->SetModel(modelFence);
-    object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });
-    object3d->SetCamera(camera);
+    // --- 3Dオブジェクト生成 (Fence用) ---
+    Object3d* object3dFence = new Object3d();
+    object3dFence->Initialize(object3dCommon);
+    object3dFence->SetModel(modelFence);
+    object3dFence->SetTranslate({ -2.0f, 0.0f, 0.0f });
+    object3dFence->SetCamera(camera);
+
+    // --- 3Dオブジェクト生成 (Sphere用) (★追加) ---
+    Object3d* object3dSphere = new Object3d();
+    object3dSphere->Initialize(object3dCommon);
+    object3dSphere->SetSphere(sphere);
+    object3dSphere->SetTranslate({ 2.0f, 0.0f, 0.0f });
+    object3dSphere->SetCamera(camera);
 
     // テクスチャロード
     texManager->LoadTexture("resources/obj/fence/fence.png");
@@ -79,16 +92,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     uint32_t texIndexFence = texManager->GetTextureIndexByFilePath("resources/obj/fence/fence.png");
 
     // --- 変数 (ImGui用) ---
-    int currentModelTexture = 1; // 0:uvChecker, 1:Fence
+    int currentModelTexture = 1;
     int currentBlendMode = 0;
     const char* blendModeNames[] = { "Normal","Add","Subtract","Multiply","Screen","None" };
-
-    float layoutStartX = -1.4f;
-    float layoutStartY = -0.8f;
-    float layoutStartZ = 0.0f;
-    float layoutStepX = 0.22f;
-    float layoutStepY = 0.11f;
-    float layoutStepZ = 0.05f;
+    // ライティング種類 (Toon含む)
+    const char* lightingTypeNames[] = { "Half-Lambert", "Lambert", "Phong", "Blinn-Phong", "Toon" };
 
     // メインループ
     while (true) {
@@ -122,75 +130,55 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             camera->SetTranslate(trans);
         }
 
-        // ★更新
+        // 更新
         camera->Update();
-        object3d->Update();
+        object3dFence->Update();
+        object3dSphere->Update(); // ★更新忘れずに
 
         // --- パーティクル操作 ---
         if (input.PushKey(DIK_SPACE)) {
             particleManager->Emit("resources/obj/axis/uvChecker.png", { 0,0,0 }, 2);
         }
         if (!ImGui::GetIO().WantCaptureMouse && input.MouseTrigger(Input::MouseLeft)) {
-            Vector3 pos = camera->GetTranslate();
-            Vector3 rot = camera->GetRotate();
-            pos.x += std::sin(rot.y) * 5.0f;
-            pos.z += std::cos(rot.y) * 5.0f;
-            particleManager->Emit("resources/obj/axis/uvChecker.png", pos, 10);
+            // 左クリックでパーティクル
+            // (カメラ操作と被る場合はキーボード等に変更してください)
         }
-
         particleManager->Update(camera);
 
         // --- ImGui ---
-        ImGui::Begin("Debug Menu");
-        ImGui::SeparatorText("Camera");
-        Vector3 camTrans = camera->GetTranslate();
-        if (ImGui::DragFloat3("Cam Pos", &camTrans.x, 0.1f)) camera->SetTranslate(camTrans);
+        ImGui::Begin("Settings");
 
-        ImGui::SeparatorText("Model Transform");
-        Transform& tf = object3d->GetTransform();
-        ImGui::DragFloat3("Pos", &tf.translate.x, 0.1f);
-        ImGui::DragFloat3("Rot", &tf.rotate.x, 0.01f);
-        ImGui::DragFloat3("Scl", &tf.scale.x, 0.1f);
+        if (ImGui::CollapsingHeader("Sphere Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+            Transform& tf = object3dSphere->GetTransform();
+            ImGui::DragFloat3("Trans", &tf.translate.x, 0.1f);
 
-        ImGui::SeparatorText("Model Texture");
-        const char* modelTextureNames[] = { "uvChecker", "FenceTexture" };
-        if (ImGui::Combo("Texture", &currentModelTexture, modelTextureNames, IM_ARRAYSIZE(modelTextureNames))) {
-            // ★Modelクラスに追加した関数を使ってテクスチャを切り替える
-            if (currentModelTexture == 0) modelFence->SetTextureIndex(texIndexUvChecker);
-            else modelFence->SetTextureIndex(texIndexFence);
-        }
-
-        ImGui::SeparatorText("Lighting");
-        auto* lightData = object3d->GetDirectionalLightData();
-        if (lightData) {
-            ImGui::SliderFloat3("LightDir", &lightData->direction.x, -1.0f, 1.0f);
-            ImGui::ColorEdit4("LightColor", &lightData->color.x);
-        }
-
-        ImGui::SeparatorText("Blend Mode");
-        ImGui::Combo("Blend", &currentBlendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
-
-        ImGui::SeparatorText("Particle Demo");
-        if (ImGui::Button("Emit Particles")) {
-            for (int i = 0; i < 5; ++i) {
-                Vector3 pos = {
-                    layoutStartX + layoutStepX * i,
-                    layoutStartY + layoutStepY * i,
-                    layoutStartZ + layoutStepZ * i
-                };
-                particleManager->Emit("resources/obj/axis/uvChecker.png", pos, 2);
+            Sphere::Material* material = sphere->GetMaterialData();
+            if (material) {
+                // ライティングタイプ選択
+                ImGui::Combo("Lighting", &material->lightingType, lightingTypeNames, IM_ARRAYSIZE(lightingTypeNames));
+                // 光沢度 (Toonのときは点の大きさに影響)
+                ImGui::DragFloat("Shininess", &material->shininess, 1.0f, 1.0f, 1000.0f);
             }
         }
+
+        if (ImGui::CollapsingHeader("Light Direction")) {
+            auto* lightData = object3dSphere->GetDirectionalLightData();
+            if (lightData) {
+                ImGui::SliderFloat3("Dir", &lightData->direction.x, -1.0f, 1.0f);
+            }
+        }
+
         ImGui::End();
 
         // --- 描画 ---
         ImGui::Render();
         dxCommon->PreDraw();
-
         srvManager->PreDraw();
 
         object3dCommon->CommonDrawSetting((Object3dCommon::BlendMode)currentBlendMode);
-        object3d->Draw();
+
+        object3dFence->Draw();  // フェンス
+        object3dSphere->Draw(); // ★スフィア
 
         particleManager->Draw();
 
@@ -203,7 +191,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     texManager->Finalize();
     modelManager->Finalize();
 
-    delete object3d;
+    delete object3dFence;
+    delete object3dSphere; // ★削除忘れずに
+    delete sphere;         // ★削除忘れずに
     delete camera;
     delete object3dCommon;
     delete spriteCommon;
