@@ -1,13 +1,8 @@
 #include "Particle.hlsli"
 
-struct TransformationMatrix
-{
-    float32_t4x4 WVP;
-    float32_t4x4 World;
-};
-
-// VS でインスタンス行列配列（t0）を読む
-StructuredBuffer<TransformationMatrix> gTransformationMatrix : register(t0);
+// C++のRootParameter[0] (StructuredBuffer) を受け取る
+// register(t0) は頂点シェーダーでのみ見えるように設定されている
+StructuredBuffer<ParticleForGPU> gParticle : register(t0);
 
 struct VertexShaderInput
 {
@@ -19,12 +14,16 @@ struct VertexShaderInput
 VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_InstanceID)
 {
     VertexShaderOutput output;
-    // 行優先（-Zpr）前提：mul(float4, float4x4)
-    output.position = mul(input.position, gTransformationMatrix[instanceId].WVP);
-    output.texcoord = input.texcoord;
+	
+	// インスタンスIDを使って現在のパーティクル情報を取得
+    ParticleForGPU particle = gParticle[instanceId];
 
-    // 法線は World(3x3) で回して正規化
-    float32_t3x3 world3x3 = (float32_t3x3) gTransformationMatrix[instanceId].World;
-    output.normal = normalize(mul(input.normal, world3x3));
+	// 座標変換
+    output.position = mul(input.position, particle.WVP);
+    output.texcoord = input.texcoord;
+	
+	// パーティクルの色を出力に渡す
+    output.color = particle.color;
+	
     return output;
 }

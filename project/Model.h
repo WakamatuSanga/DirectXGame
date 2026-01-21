@@ -1,6 +1,6 @@
 #pragma once
 #include "ModelCommon.h"
-#include "Matrix4x4.h" // VertexData等のために必要
+#include "Matrix4x4.h"
 #include <string>
 #include <vector>
 #include <wrl.h>
@@ -38,16 +38,14 @@ public: // メンバ関数
     // 描画
     void Draw();
 
-    // ★ImGui用：マテリアルデータをいじれるようにする
-    Material* GetMaterialData() { return materialData_; }
-
-    // ★ImGui用：テクスチャを差し替えられるようにする
+    // ★追加: 外部からテクスチャを切り替えるための関数
     void SetTextureIndex(uint32_t index) { modelData_.material.textureIndex = index; }
 
-    // .mtlファイルの読み取り (静的関数)
-    static MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
+    // ★追加: マテリアルデータへのアクセス（色変更用）
+    Material* GetMaterialData() { return materialData_; }
 
-    // .objファイルの読み取り (静的関数)
+    // 静的関数
+    static MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
     static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
 private: // メンバ変数
