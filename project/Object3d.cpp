@@ -57,11 +57,10 @@ void Object3d::CreateDirectionalLightResource() {
     directionalLightResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(DirectionalLight));
     directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
     directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-    directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
+    directionalLightData_->direction = { 0.0f, 0.0f, 1.0f };
     directionalLightData_->intensity = 1.0f;
 }
 
-// ★追加
 void Object3d::CreateCameraResource() {
     // 256バイトアライメント
     size_t sizeInBytes = (sizeof(CameraForGPU) + 255) & ~255;

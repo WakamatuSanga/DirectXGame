@@ -6,7 +6,7 @@ struct Material
     int enableLighting;
     float4x4 uvTransform;
     float shininess;
-    int lightingType; // 0:HalfLambert, 1:Lambert, 2:Phong, 3:BlinnPhong, 4:Toon
+    int lightingType; // 0:Half, 1:Lambert, 2:Phong, 3:Blinn
 };
 
 struct DirectionalLight
@@ -39,12 +39,13 @@ PixelShaderOutput main(VertexShaderOutput input)
     
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
-    
+
     if (gMaterial.enableLighting != 0)
     {
         float3 N = normalize(input.normal);
         float3 L = normalize(-gDirectionalLight.direction);
-        float3 V = normalize(gCamera.worldPosition - input.worldPosition);
+        
+        float3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
         
         float diffuseWeight = 0.0f;
         float specularWeight = 0.0f;
@@ -65,38 +66,39 @@ PixelShaderOutput main(VertexShaderOutput input)
         { // Phong
             diffuseWeight = saturate(NdotL);
             float3 R = reflect(-L, N);
-            float RdotV = dot(R, V);
+          
+            float RdotV = dot(R, toEye); 
             specularWeight = pow(saturate(RdotV), gMaterial.shininess);
         }
         else if (gMaterial.lightingType == 3)
         { // Blinn-Phong
             diffuseWeight = saturate(NdotL);
-            float3 H = normalize(L + V);
+            
+            float3 H = normalize(L + toEye); 
             float NdotH = dot(N, H);
             specularWeight = pow(saturate(NdotH), gMaterial.shininess);
         }
         else if (gMaterial.lightingType == 4)
         { // Toon
-            // ベースはLambert
             diffuseWeight = saturate(NdotL);
-            // 鏡面反射 (Phong) を閾値で切る
             float3 R = reflect(-L, N);
-            float RdotV = dot(R, V);
+            
+            float RdotV = dot(R, toEye);
             float spec = pow(saturate(RdotV), gMaterial.shininess);
             specularWeight = step(0.5f, spec);
         }
 
         float3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * diffuseWeight * gDirectionalLight.intensity;
-
+        
         if (NdotL <= 0.0f && gMaterial.lightingType != 0)
         {
             specularWeight = 0.0f;
         }
+        
         float3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularWeight;
         
         output.color.rgb = diffuse + specular;
         output.color.a = gMaterial.color.a * textureColor.a;
-        
     }
     else
     {
