@@ -23,8 +23,7 @@ void Object3d::Update() {
         const Matrix4x4& viewProjection = camera_->GetViewProjectionMatrix();
         transformationMatrixData_->WVP = Multipty(worldMatrix, viewProjection);
     } else {
-        // カメラ未セット時は単位行列等で代用（またはエラー）
-        transformationMatrixData_->WVP = worldMatrix;
+        // カメラ未セット時は単位行列等で代用（またはエラー） 
     }
 
     transformationMatrixData_->World = worldMatrix;
