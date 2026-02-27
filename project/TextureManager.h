@@ -22,7 +22,8 @@ public:
     uint32_t GetTextureIndexByFilePath(const std::string& filePath);
     D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t textureIndex);
     void ReleaseIntermediateResources();
-
+    // 指定したインデックスのテクスチャメタデータを取得する
+    const DirectX::TexMetadata& GetMetaData(uint32_t textureIndex);
 private:
     TextureManager() = default;
     ~TextureManager() = default;

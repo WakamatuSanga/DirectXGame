@@ -200,6 +200,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             }
         }
         ImGui::End();
+        // --- ImGuiのウィンドウ作成 ---
+        ImGui::Begin("Sprite Viewer");
+
+        // 1. 表示したいテクスチャのパスを指定し、インデックスを取得
+        std::string texPath = "resources/obj/axis/uvChecker.png";
+        TextureManager::GetInstance()->LoadTexture(texPath);
+        uint32_t texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(texPath);
+
+        // 2. TextureManagerからGPUハンドルを取得
+        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIndex);
+
+        // 3. テクスチャのサイズを取得（前回追加したGetMetaDataを使います）
+        const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(texIndex);
+        ImVec2 imageSize(static_cast<float>(metadata.width), static_cast<float>(metadata.height));
+
+        // ★ 4. ImGui::Image で描画！
+        ImGui::Image(reinterpret_cast<ImTextureID>(gpuHandle.ptr), imageSize);
+
+        ImGui::End();
 #endif
 
         // ImGui受付終了

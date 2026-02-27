@@ -41,7 +41,12 @@ public:
     // すでに TextureManager に登録済みのインデックスを直接セット
     void SetTextureIndex(uint32_t textureIndex) { textureIndex_ = textureIndex; }
     uint32_t GetTextureIndex() const { return textureIndex_; }
+    // テクスチャ切り出し範囲
+    const Vector2& GetTextureLeftTop() const { return textureLeftTop_; }
+    void SetTextureLeftTop(const Vector2& textureLeftTop) { textureLeftTop_ = textureLeftTop; }
 
+    const Vector2& GetTextureSize() const { return textureSize_; }
+    void SetTextureSize(const Vector2& textureSize) { textureSize_ = textureSize; }
 private:
     // 共通部へのポインタ
     SpriteCommon* spriteCommon_ = nullptr;
@@ -51,6 +56,10 @@ private:
         Vector2 texcoord;
         Vector3 normal;
     };
+    // テクスチャの切り出し左上座標（ピクセル単位）
+    Vector2 textureLeftTop_ = { 0.0f, 0.0f };
+    // テクスチャの切り出しサイズ（ピクセル単位）
+    Vector2 textureSize_ = { 100.0f, 100.0f };
 
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
     Microsoft::WRL::ComPtr<ID3D12Resource> indexResource_;
