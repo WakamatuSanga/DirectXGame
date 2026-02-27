@@ -3,8 +3,9 @@
 #include "Model.h"
 #include "Camera.h"
 #include "Object3d.h"
+#include "Sprite.h"
 
-// ゲーム本編のシーン（MyGameにあった処理を全て移植）
+// ゲーム本編のシーン
 class GameScene : public IScene {
 public:
     void Initialize() override;
@@ -17,6 +18,9 @@ private:
     Model* modelFence_ = nullptr;
     Camera* camera_ = nullptr;
     Object3d* object3d_ = nullptr;
+
+    // ImGuiでの操作対象となるスプライト
+    Sprite* debugSprite_ = nullptr;
 
     uint32_t texIndexUvChecker_ = 0;
     uint32_t texIndexFence_ = 0;
