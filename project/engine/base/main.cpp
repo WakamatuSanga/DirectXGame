@@ -13,7 +13,8 @@
 #include "Camera.h"
 #include "ParticleManager.h"
 #include "Input.h"
-#include "ImGuiManager.h" // 追加
+#include "ImGuiManager.h"
+#include "Audio.h"
 #include <cmath>
 #include <random>
 
@@ -62,6 +63,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ParticleManager* particleManager = ParticleManager::GetInstance();
     particleManager->Initialize(dxCommon, srvManager);
 
+    Audio* audio = Audio::GetInstance();
+    audio->Initialize();
+
     // --- モデルロード ---
     modelManager->LoadModel("resources/obj/fence/fence.obj");
     Model* modelFence = modelManager->FindModel("resources/obj/fence/fence.obj");
@@ -70,6 +74,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Camera* camera = new Camera();
     camera->SetTranslate({ 0.0f, 4.0f, -10.0f });
     camera->SetRotate({ 0.3f, 0.0f, 0.0f });
+
+    // --- BGMやSEの読み込み ---
+    audio->LoadAudio("resources/sounds/Alarm01.mp3");
 
     // --- 3Dオブジェクト生成 ---
     Object3d* object3d = new Object3d();
@@ -135,7 +142,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             trans.z += (move.x * -std::sin(rot.y) + move.z * std::cos(rot.y)) * speed;
             camera->SetTranslate(trans);
         }
-
+        if (input.PushKey(DIK_0)) {
+            audio->PlayAudio("resources/sounds/Alarm01.mp3");
+        }
         // ★更新
         camera->Update();
         object3d->Update();
