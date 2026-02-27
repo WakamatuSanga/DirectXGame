@@ -1,21 +1,22 @@
 #include "WinApp.h"
 #include <cassert>
 
-// ImGui Win32 ハンドラ
+#ifdef _DEBUG
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_win32.h"
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
     HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
+#endif
 // --------------------
 // ウィンドウプロシージャ
 // --------------------
 LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
+#ifdef _DEBUG
     if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
         return true;
     }
-
+#endif
     switch (msg) {
     case WM_DESTROY:
         PostQuitMessage(0);

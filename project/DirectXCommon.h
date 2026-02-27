@@ -33,7 +33,7 @@ public:
     // 最大SRV数（最大テクスチャ枚数）
     static const uint32_t kMaxSRVCount;
 
-    // --- getter（スライド通り＋少し追加） ---
+    // --- getter ---
     ID3D12Device* GetDevice() const { return device.Get(); }
     ID3D12GraphicsCommandList* GetCommandList() const { return commandList.Get(); }
     IDXGISwapChain4* GetSwapChain() const { return swapChain.Get(); }
@@ -43,6 +43,9 @@ public:
     ID3D12DescriptorHeap* GetDsvDescriptorHeap() const { return dsvDescriptorHeap.Get(); }
 
     UINT GetSrvDescriptorSize() const { return descriptorSizeSRV; }
+
+    // ★追加: バックバッファの数を取得 (ImGui初期化などで使用)
+    size_t GetBackBufferCount() const { return swapChainResources.size(); }
 
     // バックバッファ RTV を直接欲しい場合
     D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRTV(uint32_t index) const {
@@ -54,7 +57,7 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
 
     // ============================
-    // ここからスライドの追加関数
+    // 追加関数
     // ============================
 
     // シェーダーのコンパイル
@@ -77,7 +80,7 @@ public:
     /// <summary>テクスチャファイルの読み込み（静的関数）</summary>
     static DirectX::ScratchImage LoadTexture(const std::string& filePath);
 
-    // ★ DXC 関連 Getter（外からも使えるように）
+    // ★ DXC 関連 Getter
     IDxcUtils* GetDxcUtils() const { return dxcUtils.Get(); }
     IDxcCompiler3* GetDxcCompiler() const { return dxcCompiler.Get(); }
     IDxcIncludeHandler* GetDxcIncludeHandler() const { return dxcIncludeHandler.Get(); }

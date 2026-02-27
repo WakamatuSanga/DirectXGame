@@ -13,11 +13,14 @@
 #include "Camera.h"
 #include "ParticleManager.h"
 #include "Input.h"
-#include "externals/imgui/imgui.h"
-#include "externals/imgui/imgui_impl_dx12.h"
-#include "externals/imgui/imgui_impl_win32.h"
+#include "ImGuiManager.h" // 追加
 #include <cmath>
 #include <random>
+
+// デバッグ時のみImGuiのヘッダをインクルード
+#ifdef _DEBUG
+#include "externals/imgui/imgui.h"
+#endif
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
     return EXCEPTION_EXECUTE_HANDLER;
@@ -36,6 +39,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     SrvManager* srvManager = SrvManager::GetInstance();
     srvManager->Initialize(dxCommon);
+
+    // ImGuiManager初期化
+    ImGuiManager* imguiManager = new ImGuiManager();
+    imguiManager->Initialize(winApp, dxCommon);
 
     TextureManager* texManager = TextureManager::GetInstance();
     texManager->Initialize(dxCommon, srvManager);
@@ -78,10 +85,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     uint32_t texIndexUvChecker = texManager->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
     uint32_t texIndexFence = texManager->GetTextureIndexByFilePath("resources/obj/fence/fence.png");
 
-    // --- 変数 (ImGui用) ---
+    // --- 変数 ---
     int currentModelTexture = 1; // 0:uvChecker, 1:Fence
     int currentBlendMode = 0;
+#ifdef _DEBUG
     const char* blendModeNames[] = { "Normal","Add","Subtract","Multiply","Screen","None" };
+#endif
 
     float layoutStartX = -1.4f;
     float layoutStartY = -0.8f;
@@ -94,13 +103,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     while (true) {
         if (winApp->ProcessMessage()) break;
 
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
+        // ImGui受付開始
+        imguiManager->Begin();
+
         input.Update();
 
         // --- カメラ操作 ---
+#ifdef _DEBUG
+        // ImGuiがマウスをキャプチャしている時はカメラを動かさない
         if (!ImGui::GetIO().WantCaptureMouse && input.MouseDown(Input::MouseLeft)) {
+#else
+        if (input.MouseDown(Input::MouseLeft)) {
+#endif
             Vector3 rot = camera->GetRotate();
             rot.y += input.MouseDeltaX() * 0.0025f;
             rot.x += input.MouseDeltaY() * 0.0025f;
@@ -130,7 +144,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         if (input.PushKey(DIK_SPACE)) {
             particleManager->Emit("resources/obj/axis/uvChecker.png", { 0,0,0 }, 2);
         }
+#ifdef _DEBUG
         if (!ImGui::GetIO().WantCaptureMouse && input.MouseTrigger(Input::MouseLeft)) {
+#else
+        if (input.MouseTrigger(Input::MouseLeft)) {
+#endif
             Vector3 pos = camera->GetTranslate();
             Vector3 rot = camera->GetRotate();
             pos.x += std::sin(rot.y) * 5.0f;
@@ -140,7 +158,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         particleManager->Update(camera);
 
-        // --- ImGui ---
+        // --- ImGui (デバッグ時のみ) ---
+#ifdef _DEBUG
         ImGui::Begin("Debug Menu");
         ImGui::SeparatorText("Camera");
         Vector3 camTrans = camera->GetTranslate();
@@ -155,7 +174,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         ImGui::SeparatorText("Model Texture");
         const char* modelTextureNames[] = { "uvChecker", "FenceTexture" };
         if (ImGui::Combo("Texture", &currentModelTexture, modelTextureNames, IM_ARRAYSIZE(modelTextureNames))) {
-            // ★Modelクラスに追加した関数を使ってテクスチャを切り替える
             if (currentModelTexture == 0) modelFence->SetTextureIndex(texIndexUvChecker);
             else modelFence->SetTextureIndex(texIndexFence);
         }
@@ -182,11 +200,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             }
         }
         ImGui::End();
+#endif
+
+        // ImGui受付終了
+        imguiManager->End();
 
         // --- 描画 ---
-        ImGui::Render();
         dxCommon->PreDraw();
-
         srvManager->PreDraw();
 
         object3dCommon->CommonDrawSetting((Object3dCommon::BlendMode)currentBlendMode);
@@ -194,15 +214,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         particleManager->Draw();
 
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
+        // ImGui描画
+        imguiManager->Draw();
+
         dxCommon->PostDraw();
-    }
+        }
 
     texManager->ReleaseIntermediateResources();
     particleManager->Finalize();
+    imguiManager->Finalize(); // ImGui解放
     texManager->Finalize();
     modelManager->Finalize();
 
+    delete imguiManager; // 解放
     delete object3d;
     delete camera;
     delete object3dCommon;
@@ -212,4 +236,4 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     CoUninitialize();
     return 0;
-}
+        }
