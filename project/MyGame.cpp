@@ -74,8 +74,9 @@ void MyGame::Finalize() {
     delete winApp_;
     delete input_;
 
-    audio_->Finalize();
-
+    if (audio_) {
+        audio_->Finalize();
+    }
     delete instance_;
     instance_ = nullptr;
 }
