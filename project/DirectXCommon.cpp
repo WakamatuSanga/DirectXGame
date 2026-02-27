@@ -16,10 +16,6 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxcompiler.lib")
 
-#include "externals/imgui/imgui.h"
-#include "externals/imgui/imgui_impl_dx12.h"
-#include "externals/imgui/imgui_impl_win32.h"
-
 using namespace Microsoft::WRL;
 
 // ======================================
@@ -78,7 +74,6 @@ void DirectXCommon::Initialize(WinApp* winApp)
     InitializeViewport();         // ビューポート
     InitializeScissorRect();      // シザー矩形
     CreateDXCCompiler();          // DXC コンパイラ
-    InitializeImGui();            // ImGui
 
     // ★ ここでの dxcUtils_ / dxcCompiler_ / dxcIncludeHandler_ の
     //    二重初期化は削除。
@@ -517,22 +512,22 @@ void DirectXCommon::CreateDXCCompiler()
 // --------------------
 // ImGui 初期化
 // --------------------
-void DirectXCommon::InitializeImGui()
-{
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsClassic();
-
-    ImGui_ImplWin32_Init(winApp->GetHwnd());
-
-    ImGui_ImplDX12_Init(
-        device.Get(),
-        2,
-        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-        srvDescriptorHeap.Get(),
-        srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-        srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-}
+//void DirectXCommon::InitializeImGui()
+//{
+//    IMGUI_CHECKVERSION();
+//    ImGui::CreateContext();
+//    ImGui::StyleColorsClassic();
+//
+//    ImGui_ImplWin32_Init(winApp->GetHwnd());
+//
+//    ImGui_ImplDX12_Init(
+//        device.Get(),
+//        2,
+//        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+//        srvDescriptorHeap.Get(),
+//        srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+//        srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+//}
 
 // ============================================================
 // ここから スライドで「自分で考えよう」となっている各種関数
