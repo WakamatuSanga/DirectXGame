@@ -1,17 +1,17 @@
 #include "SceneManager.h"
 
-SceneManager* SceneManager::instance_ = nullptr;
+std::unique_ptr<SceneManager> SceneManager::instance_ = nullptr;
 
 SceneManager* SceneManager::GetInstance() {
-    if (instance_ == nullptr) {
-        instance_ = new SceneManager();
+    if (!instance_) {
+        instance_.reset(new SceneManager());
     }
-    return instance_;
+    return instance_.get();
 }
 
-void SceneManager::ChangeScene(IScene* newScene) {
-    // 次のシーンを予約しておく（実行中のUpdate途中で破棄されないようにするため）
-    nextScene_ = newScene;
+void SceneManager::ChangeScene(std::unique_ptr<IScene> newScene) {
+    // 所有権の移動
+    nextScene_ = std::move(newScene);
 }
 
 void SceneManager::Update() {
@@ -20,18 +20,16 @@ void SceneManager::Update() {
         // 古いシーンの終了処理
         if (currentScene_) {
             currentScene_->Finalize();
-            delete currentScene_;
+            // unique_ptrの書き換えにより、古いシーンは自動でdeleteされます
         }
 
         // 新しいシーンを現在のシーンにする
-        currentScene_ = nextScene_;
-        nextScene_ = nullptr;
+        currentScene_ = std::move(nextScene_);
 
         // 新しいシーンの初期化
         currentScene_->Initialize();
     }
 
-    // 現在のシーンの更新処理
     if (currentScene_) {
         currentScene_->Update();
     }
@@ -46,10 +44,6 @@ void SceneManager::Draw() {
 void SceneManager::Finalize() {
     if (currentScene_) {
         currentScene_->Finalize();
-        delete currentScene_;
-        currentScene_ = nullptr;
+        currentScene_.reset(); // 自動delete
     }
-
-    delete instance_;
-    instance_ = nullptr;
 }

@@ -1,23 +1,17 @@
 #include "TitleScene.h"
 #include "SceneManager.h"
-#include "GameScene.h" // 次のシーン
-#include "MyGame.h"    // 入力取得のため
+#include "GameScene.h" 
+#include "MyGame.h"    
 
-// デバッグ時のみImGuiのヘッダをインクルード
 #ifdef _DEBUG
 #include "externals/imgui/imgui.h"
 #endif
 
-void TitleScene::Initialize() {
-    // タイトルシーンに入った時の初期化処理
-}
+void TitleScene::Initialize() {}
 
-void TitleScene::Finalize() {
-    // タイトルシーンを抜ける時の終了処理
-}
+void TitleScene::Finalize() {}
 
 void TitleScene::Update() {
-    // --- デバッグUI表示 ---
 #ifdef _DEBUG
     ImGui::Begin("Title Scene");
     ImGui::Text("This is Title Scene.");
@@ -25,12 +19,10 @@ void TitleScene::Update() {
     ImGui::End();
 #endif
 
-    // スペースキーを押したら、GameScene へ切り替える（状態の移行）
+    // unique_ptrを使ってシーン切り替え
     if (MyGame::GetInstance()->GetInput()->PushKey(DIK_SPACE)) {
-        SceneManager::GetInstance()->ChangeScene(new GameScene());
+        SceneManager::GetInstance()->ChangeScene(std::make_unique<GameScene>());
     }
 }
 
-void TitleScene::Draw() {
-    // タイトル画面用のスプライトや文字があればここで描画する
-}
+void TitleScene::Draw() {}

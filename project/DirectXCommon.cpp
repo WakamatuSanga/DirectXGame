@@ -274,7 +274,7 @@ void DirectXCommon::CreateDevice()
     assert(device);
 
 #ifdef _DEBUG
-    ID3D12InfoQueue* infoQueue = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
@@ -292,7 +292,6 @@ void DirectXCommon::CreateDevice()
         filter.DenyList.NumSeverities = _countof(severities);
         filter.DenyList.pSeverityList = severities;
         infoQueue->PushStorageFilter(&filter);
-        infoQueue->Release();
     }
 #endif
 }

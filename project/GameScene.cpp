@@ -18,27 +18,24 @@ void GameScene::Initialize() {
     auto object3dCommon = MyGame::GetInstance()->GetObject3dCommon();
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
 
-    // --- モデルロード ---
+    // 生ポインタで参照をもらう
     modelFence_ = modelManager->FindModel("resources/obj/fence/fence.obj");
 
-    // --- カメラ生成 ---
-    camera_ = new Camera();
+    // make_unique で生成
+    camera_ = std::make_unique<Camera>();
     camera_->SetTranslate({ 0.0f, 4.0f, -10.0f });
     camera_->SetRotate({ 0.3f, 0.0f, 0.0f });
 
-    // --- 3Dオブジェクト生成 ---
-    object3d_ = new Object3d();
+    object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCommon);
     object3d_->SetModel(modelFence_);
     object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
-    object3d_->SetCamera(camera_);
+    object3d_->SetCamera(camera_.get()); // 生ポインタを渡す
 
-    // テクスチャインデックス取得
     texIndexUvChecker_ = texManager->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
     texIndexFence_ = texManager->GetTextureIndexByFilePath("resources/obj/fence/fence.png");
 
-    // デバッグ対象用スプライトの初期化
-    debugSprite_ = new Sprite();
+    debugSprite_ = std::make_unique<Sprite>();
     debugSprite_->Initialize(spriteCommon);
     debugSprite_->SetTexture("resources/obj/axis/uvChecker.png");
     debugSprite_->SetPosition({ 100.0f, 100.0f });
@@ -46,9 +43,7 @@ void GameScene::Initialize() {
 }
 
 void GameScene::Finalize() {
-    delete debugSprite_;
-    delete object3d_;
-    delete camera_;
+    // ★ unique_ptr により delete は完全に不要になりました！
 }
 
 void GameScene::Update() {
@@ -57,9 +52,9 @@ void GameScene::Update() {
     auto audio = Audio::GetInstance();
     auto texManager = TextureManager::GetInstance();
 
-    // [T]キーでタイトルに戻る処理
+    // タイトルへ戻る処理 (make_unique を使用)
     if (input->PushKey(DIK_T)) {
-        SceneManager::GetInstance()->ChangeScene(new TitleScene());
+        SceneManager::GetInstance()->ChangeScene(std::make_unique<TitleScene>());
         return;
     }
 
@@ -94,12 +89,10 @@ void GameScene::Update() {
         audio->PlayAudio("resources/sounds/Alarm01.mp3");
     }
 
-    // 各種更新
     camera_->Update();
     object3d_->Update();
     debugSprite_->Update();
 
-    // --- パーティクル操作 ---
     if (input->PushKey(DIK_SPACE)) {
         particleManager->Emit("resources/obj/axis/uvChecker.png", { 0,0,0 }, 2);
     }
@@ -115,21 +108,13 @@ void GameScene::Update() {
         particleManager->Emit("resources/obj/axis/uvChecker.png", pos, 10);
     }
 
-    particleManager->Update(camera_);
+    particleManager->Update(camera_.get());
 
-    // ==========================================
-    // ImGui メニュー群 (デバッグ時のみ)
-    // ==========================================
+    // --- ImGui ---
 #ifdef _DEBUG
-
-    // ------------------------------------------
-    // スプライトのデバッグテキスト
-    // ------------------------------------------
-    // ※ ウィンドウサイズ (500, 200) はスライドの指示通りの数値に合わせてください
     ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_Once);
-    ImGui::Begin("DebugText"); // ※ ウィンドウ名もスライドの指定に合わせてください
+    ImGui::Begin("DebugText");
     Vector2 spritePos = debugSprite_->GetPosition();
-    // 整数4桁・小数1桁 (%4.1f) の書式指定
     ImGui::DragFloat2("Sprite Pos", &spritePos.x, 1.0f, -9999.0f, 9999.0f, "%4.1f");
     debugSprite_->SetPosition(spritePos);
     ImGui::End();
@@ -176,6 +161,7 @@ void GameScene::Update() {
         }
     }
     ImGui::End();
+
     ImGui::Begin("Sprite Viewer");
     std::string texPath = "resources/obj/axis/uvChecker.png";
     uint32_t texIndex = texManager->GetTextureIndexByFilePath(texPath);
@@ -184,7 +170,6 @@ void GameScene::Update() {
     ImVec2 imageSize(static_cast<float>(metadata.width), static_cast<float>(metadata.height));
     ImGui::Image(reinterpret_cast<ImTextureID>(gpuHandle.ptr), imageSize);
     ImGui::End();
-
 #endif
     }
 
@@ -193,12 +178,10 @@ void GameScene::Draw() {
     auto particleManager = ParticleManager::GetInstance();
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
 
-    // 3Dオブジェクトとパーティクルの描画
     object3dCommon->CommonDrawSetting((Object3dCommon::BlendMode)currentBlendMode_);
     object3d_->Draw();
     particleManager->Draw();
 
-    // スプライトの描画 (3Dの後、ImGuiの前に描画します)
     spriteCommon->CommonDrawSetting();
     debugSprite_->Draw();
 }
