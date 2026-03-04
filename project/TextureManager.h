@@ -4,17 +4,20 @@
 #include <algorithm>
 #include <wrl.h>
 #include <d3d12.h>
+#include <memory>
 #include "externals/DirectXTex/DirectXTex.h"
 #include "DirectXCommon.h"
-#include "SrvManager.h" // 追加
+#include "SrvManager.h"
 #include "StringUtility.h"
 
 /// テクスチャマネージャ
 class TextureManager {
+    
+    friend struct std::default_delete<TextureManager>;
+
 public:
     static TextureManager* GetInstance();
 
-    // SrvManager も受け取る
     void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
     void Finalize();
 
@@ -22,8 +25,8 @@ public:
     uint32_t GetTextureIndexByFilePath(const std::string& filePath);
     D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t textureIndex);
     void ReleaseIntermediateResources();
-    // 指定したインデックスのテクスチャメタデータを取得する
     const DirectX::TexMetadata& GetMetaData(uint32_t textureIndex);
+
 private:
     TextureManager() = default;
     ~TextureManager() = default;
@@ -35,14 +38,15 @@ private:
         DirectX::TexMetadata metadata;
         Microsoft::WRL::ComPtr<ID3D12Resource> resource;
         Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource;
-        D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU{};
-        D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU{};
-        uint32_t srvIndex = 0; // 割り当てられたSRVインデックス
+        D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU;
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU;
+        uint32_t srvIndex;
     };
+
+    static std::unique_ptr<TextureManager> instance_;
 
     std::vector<TextureData> textureDatas;
 
-    static TextureManager* instance;
     DirectXCommon* dxCommon_ = nullptr;
-    SrvManager* srvManager_ = nullptr; // 追加
+    SrvManager* srvManager_ = nullptr;
 };

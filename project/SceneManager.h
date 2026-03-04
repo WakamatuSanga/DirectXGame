@@ -1,18 +1,19 @@
 #pragma once
 #include "IScene.h"
+#include <memory>
 
-// シーンを管理するクラス（StateパターンのContext）
+// シーンを管理するクラス
 class SceneManager {
+    friend struct std::default_delete<SceneManager>;
 public:
     static SceneManager* GetInstance();
 
-    // 毎フレームの更新と描画
     void Update();
     void Draw();
     void Finalize();
 
-    // 次のシーンを予約する
-    void ChangeScene(IScene* newScene);
+    // 次のシーンを予約する (unique_ptrで所有権ごと受け取る)
+    void ChangeScene(std::unique_ptr<IScene> newScene);
 
 private:
     SceneManager() = default;
@@ -21,8 +22,8 @@ private:
     SceneManager& operator=(const SceneManager&) = delete;
 
 private:
-    static SceneManager* instance_;
+    static std::unique_ptr<SceneManager> instance_;
 
-    IScene* currentScene_ = nullptr; // 現在のシーン(State)
-    IScene* nextScene_ = nullptr;    // 次のシーン(切り替え予約用)
+    std::unique_ptr<IScene> currentScene_; // 現在のシーン
+    std::unique_ptr<IScene> nextScene_;    // 次のシーン(切り替え予約用)
 };

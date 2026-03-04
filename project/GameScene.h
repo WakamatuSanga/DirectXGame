@@ -4,8 +4,8 @@
 #include "Camera.h"
 #include "Object3d.h"
 #include "Sprite.h"
+#include <memory>
 
-// ゲーム本編のシーン
 class GameScene : public IScene {
 public:
     void Initialize() override;
@@ -14,13 +14,13 @@ public:
     void Finalize() override;
 
 private:
-    // --- ゲーム固有データ ---
-    Model* modelFence_ = nullptr;
-    Camera* camera_ = nullptr;
-    Object3d* object3d_ = nullptr;
+    // --- 自分が所有権を持つデータは unique_ptr ---
+    std::unique_ptr<Camera> camera_;
+    std::unique_ptr<Object3d> object3d_;
+    std::unique_ptr<Sprite> debugSprite_;
 
-    // ImGuiでの操作対象となるスプライト
-    Sprite* debugSprite_ = nullptr;
+    // --- 他人が所有しているデータは 生ポインタ (オブザーバー) ---
+    Model* modelFence_ = nullptr; // ModelManagerが所有している
 
     uint32_t texIndexUvChecker_ = 0;
     uint32_t texIndexFence_ = 0;

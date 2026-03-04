@@ -7,50 +7,47 @@
 #include <wrl.h>
 #include <string>
 #include <map>
+#include <memory>
+#include <unordered_set>
 
-// XAudio2 と MediaFoundation のライブラリをリンク
 #pragma comment(lib, "xaudio2.lib")
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
 
 class Audio {
+    friend struct std::default_delete<Audio>;
 public:
-    // 音声データ構造体
     struct SoundData {
         WAVEFORMATEX wfex;
-        BYTE* pBuffer;
+        std::unique_ptr<BYTE[]> pBuffer; // unique_ptrで配列を管理
         unsigned int bufferSize;
     };
 
-public: // メンバ関数
+public:
     static Audio* GetInstance();
 
     void Initialize();
     void Finalize();
 
-    // =============== ここに追加しています ===============
-    // 音声ファイルの読み込み (WAV, MP3 など対応)
     void LoadAudio(const std::string& filename);
-
-    // 音声の再生
     void PlayAudio(const std::string& filename);
-    // ====================================================
 
-private: // プライベート関数
+private:
     Audio() = default;
     ~Audio() = default;
     Audio(const Audio&) = delete;
     Audio& operator=(const Audio&) = delete;
 
-    // 音声データの解放
     void UnloadAudio(SoundData* soundData);
 
-private: // メンバ変数
-    static Audio* instance_;
+private:
+    static std::unique_ptr<Audio> instance_;
 
     Microsoft::WRL::ComPtr<IXAudio2> xAudio2_;
     IXAudio2MasteringVoice* masterVoice_ = nullptr;
 
     std::map<std::string, SoundData> soundDatas_;
+
+    std::unordered_set<IXAudio2SourceVoice*> sourceVoices_;
 };
