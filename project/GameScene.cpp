@@ -18,22 +18,39 @@ void GameScene::Initialize() {
     auto object3dCommon = MyGame::GetInstance()->GetObject3dCommon();
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
 
-    // 生ポインタで参照をもらう
+    // --- モデル取得・生成 ---
     modelFence_ = modelManager->FindModel("resources/obj/fence/fence.obj");
 
-    // make_unique で生成
+    modelSphere_ = modelManager->CreateSphere("InternalSphere", 16);
+
     camera_ = std::make_unique<Camera>();
-    camera_->SetTranslate({ 0.0f, 4.0f, -10.0f });
-    camera_->SetRotate({ 0.3f, 0.0f, 0.0f });
+    camera_->SetTranslate({ 0.0f, 2.0f, -10.0f });
+    camera_->SetRotate({ 0.1f, 0.0f, 0.0f });
 
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCommon);
     object3d_->SetModel(modelFence_);
-    object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
-    object3d_->SetCamera(camera_.get()); // 生ポインタを渡す
+    object3d_->SetTranslate({ -2.0f, 0.0f, 0.0f });
+    object3d_->SetCamera(camera_.get());
+
+    object3dSphere_ = std::make_unique<Object3d>();
+    object3dSphere_->Initialize(object3dCommon);
+    object3dSphere_->SetModel(modelSphere_); // 生成した球体をセット
+    object3dSphere_->SetTranslate({ 2.0f, 0.0f, 0.0f });
+    object3dSphere_->SetCamera(camera_.get());
+
+    texManager->LoadTexture("resources/obj/axis/uvChecker.png");
+    texManager->LoadTexture("resources/obj/fence/fence.png");
+    texManager->LoadTexture("resources/obj/monsterBall/monsterBall.png");
 
     texIndexUvChecker_ = texManager->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
     texIndexFence_ = texManager->GetTextureIndexByFilePath("resources/obj/fence/fence.png");
+    texIndexMonsterBall_ = texManager->GetTextureIndexByFilePath("resources/obj/monsterBall/monsterBall.png");
+
+    if (modelSphere_) {
+        // 初期テクスチャをモンスターボールに設定
+        modelSphere_->SetTextureIndex(texIndexMonsterBall_);
+    }
 
     debugSprite_ = std::make_unique<Sprite>();
     debugSprite_->Initialize(spriteCommon);
@@ -42,9 +59,7 @@ void GameScene::Initialize() {
     debugSprite_->SetSize({ 100.0f, 100.0f });
 }
 
-void GameScene::Finalize() {
-    // ★ unique_ptr により delete は完全に不要になりました！
-}
+void GameScene::Finalize() {}
 
 void GameScene::Update() {
     auto input = MyGame::GetInstance()->GetInput();
@@ -52,13 +67,11 @@ void GameScene::Update() {
     auto audio = Audio::GetInstance();
     auto texManager = TextureManager::GetInstance();
 
-    // タイトルへ戻る処理 (make_unique を使用)
     if (input->PushKey(DIK_T)) {
         SceneManager::GetInstance()->ChangeScene(std::make_unique<TitleScene>());
         return;
     }
 
-    // --- カメラ操作 ---
 #ifdef _DEBUG
     if (!ImGui::GetIO().WantCaptureMouse && input->MouseDown(Input::MouseLeft)) {
 #else
@@ -85,12 +98,11 @@ void GameScene::Update() {
         camera_->SetTranslate(trans);
     }
 
-    if (input->PushKey(DIK_0)) {
-        audio->PlayAudio("resources/sounds/Alarm01.mp3");
-    }
+    if (input->PushKey(DIK_0)) audio->PlayAudio("resources/sounds/Alarm01.mp3");
 
     camera_->Update();
     object3d_->Update();
+    object3dSphere_->Update();
     debugSprite_->Update();
 
     if (input->PushKey(DIK_SPACE)) {
@@ -110,7 +122,6 @@ void GameScene::Update() {
 
     particleManager->Update(camera_.get());
 
-    // --- ImGui ---
 #ifdef _DEBUG
     ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_Once);
     ImGui::Begin("DebugText");
@@ -121,54 +132,52 @@ void GameScene::Update() {
 
     ImGui::Begin("Game Scene Menu");
     ImGui::Text("Press [T] to return to Title");
-
     ImGui::SeparatorText("Camera");
     Vector3 camTrans = camera_->GetTranslate();
     if (ImGui::DragFloat3("Cam Pos", &camTrans.x, 0.1f)) camera_->SetTranslate(camTrans);
 
+    ImGui::SeparatorText("Target Object Selection");
+    ImGui::Combo("Target", &targetObjectIndex_, "Fence\0Sphere\0");
+
+    Object3d* targetObj = (targetObjectIndex_ == 0) ? object3d_.get() : object3dSphere_.get();
+
     ImGui::SeparatorText("Model Transform");
-    Transform& tf = object3d_->GetTransform();
+    Transform& tf = targetObj->GetTransform();
     ImGui::DragFloat3("Pos", &tf.translate.x, 0.1f);
     ImGui::DragFloat3("Rot", &tf.rotate.x, 0.01f);
     ImGui::DragFloat3("Scl", &tf.scale.x, 0.1f);
 
     ImGui::SeparatorText("Model Texture");
-    const char* modelTextureNames[] = { "uvChecker", "FenceTexture" };
+    const char* modelTextureNames[] = { "uvChecker", "FenceTexture", "MonsterBall" };
     if (ImGui::Combo("Texture", &currentModelTexture_, modelTextureNames, IM_ARRAYSIZE(modelTextureNames))) {
-        if (currentModelTexture_ == 0) modelFence_->SetTextureIndex(texIndexUvChecker_);
-        else modelFence_->SetTextureIndex(texIndexFence_);
+        Model* targetModel = (targetObjectIndex_ == 0) ? modelFence_ : modelSphere_;
+        if (targetModel) {
+            if (currentModelTexture_ == 0) targetModel->SetTextureIndex(texIndexUvChecker_);
+            else if (currentModelTexture_ == 1) targetModel->SetTextureIndex(texIndexFence_);
+            else if (currentModelTexture_ == 2) targetModel->SetTextureIndex(texIndexMonsterBall_);
+        }
     }
 
-    ImGui::SeparatorText("Lighting");
-    auto* lightData = object3d_->GetDirectionalLightData();
+    ImGui::SeparatorText("Lighting & Material");
+    auto* lightData = targetObj->GetDirectionalLightData();
     if (lightData) {
-        ImGui::SliderFloat3("LightDir", &lightData->direction.x, -1.0f, 1.0f);
-        ImGui::ColorEdit4("LightColor", &lightData->color.x);
+        if (ImGui::SliderFloat3("LightDir", &lightData->direction.x, -1.0f, 1.0f)) {
+            float len = std::sqrt(lightData->direction.x * lightData->direction.x +
+                lightData->direction.y * lightData->direction.y +
+                lightData->direction.z * lightData->direction.z);
+            if (len > 0.0f) {
+                lightData->direction.x /= len;
+                lightData->direction.y /= len;
+                lightData->direction.z /= len;
+            }
+        }
+        ImGui::ColorEdit3("LightColor", &lightData->color.x);
+        ImGui::DragFloat("Intensity", &lightData->intensity, 0.01f, 0.0f, 10.0f);
+        ImGui::DragFloat("Shininess", &lightData->shininess, 1.0f, 1.0f, 256.0f, "%.1f");
     }
 
     ImGui::SeparatorText("Blend Mode");
     ImGui::Combo("Blend", &currentBlendMode_, blendModeNames_, IM_ARRAYSIZE(blendModeNames_));
-
-    ImGui::SeparatorText("Particle Demo");
-    if (ImGui::Button("Emit Particles")) {
-        for (int i = 0; i < 5; ++i) {
-            Vector3 pos = {
-                layoutStartX_ + layoutStepX_ * i,
-                layoutStartY_ + layoutStepY_ * i,
-                layoutStartZ_ + layoutStepZ_ * i
-            };
-            particleManager->Emit("resources/obj/axis/uvChecker.png", pos, 2);
-        }
-    }
-    ImGui::End();
-
-    ImGui::Begin("Sprite Viewer");
-    std::string texPath = "resources/obj/axis/uvChecker.png";
-    uint32_t texIndex = texManager->GetTextureIndexByFilePath(texPath);
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = texManager->GetSrvHandleGPU(texIndex);
-    const DirectX::TexMetadata& metadata = texManager->GetMetaData(texIndex);
-    ImVec2 imageSize(static_cast<float>(metadata.width), static_cast<float>(metadata.height));
-    ImGui::Image(reinterpret_cast<ImTextureID>(gpuHandle.ptr), imageSize);
     ImGui::End();
 #endif
     }
@@ -179,7 +188,10 @@ void GameScene::Draw() {
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
 
     object3dCommon->CommonDrawSetting((Object3dCommon::BlendMode)currentBlendMode_);
+
     object3d_->Draw();
+    object3dSphere_->Draw();
+
     particleManager->Draw();
 
     spriteCommon->CommonDrawSetting();

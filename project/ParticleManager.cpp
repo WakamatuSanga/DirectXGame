@@ -38,7 +38,6 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 }
 
 void ParticleManager::Finalize() {
-    // delete instance_; は unique_ptr なので不要
     particles_.clear();
 }
 
@@ -99,7 +98,7 @@ void ParticleManager::Draw() {
 
 void ParticleManager::Emit(const std::string& name, const Vector3& pos, uint32_t count) {
     std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen(rd()); // C++標準の正しい乱数エンジン
     std::uniform_real_distribution<float> distVelocity(-0.05f, 0.05f);
     std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
@@ -115,9 +114,6 @@ void ParticleManager::Emit(const std::string& name, const Vector3& pos, uint32_t
     }
 }
 
-// ---------------------------------------------
-// 初期化系関数の実装
-// ---------------------------------------------
 void ParticleManager::CreateRootSignature() {
     HRESULT hr = S_OK;
     D3D12_ROOT_PARAMETER rootParameters[2]{};
@@ -164,7 +160,6 @@ void ParticleManager::CreateRootSignature() {
     ComPtr<ID3DBlob> signatureBlob;
     ComPtr<ID3DBlob> errorBlob;
     hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-    if (FAILED(hr)) { OutputDebugStringA(reinterpret_cast<char*>(errorBlob->GetBufferPointer())); assert(false); }
     hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature_));
     assert(SUCCEEDED(hr));
 }
@@ -191,7 +186,6 @@ void ParticleManager::CreatePipelineState() {
     desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 
-    // パーティクル用ブレンド(加算寄り)
     desc.BlendState.RenderTarget[0].BlendEnable = TRUE;
     desc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
     desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
@@ -202,7 +196,7 @@ void ParticleManager::CreatePipelineState() {
     desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
     desc.DepthStencilState.DepthEnable = TRUE;
-    desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // パーティクルは深度書き込みしない
+    desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
     desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
     HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState_));

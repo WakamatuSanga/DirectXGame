@@ -26,8 +26,9 @@ public:
     void LoadModel(const std::string& filePath);
     Model* FindModel(const std::string& filePath);
 
+    Model* CreateSphere(const std::string& keyName, uint32_t subdivision = 16);
+
 private:
     std::map<std::string, std::unique_ptr<Model>> models_;
-
     std::unique_ptr<ModelCommon> modelCommon_;
 };

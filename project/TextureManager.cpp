@@ -40,9 +40,17 @@ void TextureManager::LoadTexture(const std::string& filePath) {
 
     textureDatas.resize(textureDatas.size() + 1);
     TextureData& textureData = textureDatas.back();
-
     textureData.filePath = filePath;
-    DirectX::ScratchImage mipImages = DirectXCommon::LoadTexture(filePath);
+
+    DirectX::ScratchImage image{};
+    std::wstring wFilePath = StringUtility::ConvertString(filePath);
+    HRESULT hr = DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, &textureData.metadata, image);
+    assert(SUCCEEDED(hr));
+
+    DirectX::ScratchImage mipImages{};
+    hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+    assert(SUCCEEDED(hr));
+
     textureData.metadata = mipImages.GetMetadata();
     textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
     textureData.intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages);

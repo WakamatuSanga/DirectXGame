@@ -25,7 +25,6 @@ void Audio::Initialize() {
 }
 
 void Audio::Finalize() {
-    // 再生中のボイスを安全に破棄する
     for (auto voice : sourceVoices_) {
         voice->Stop();
         voice->DestroyVoice();
@@ -38,10 +37,7 @@ void Audio::Finalize() {
     soundDatas_.clear();
 
     MFShutdown();
-
-    if (xAudio2_) {
-        xAudio2_.Reset();
-    }
+    if (xAudio2_) { xAudio2_.Reset(); }
 }
 
 void Audio::LoadAudio(const std::string& filename) {
@@ -104,7 +100,6 @@ void Audio::LoadAudio(const std::string& filename) {
     CoTaskMemFree(pWfex);
 
     soundData.bufferSize = static_cast<unsigned int>(audioData.size());
-    // ★ new BYTE[] ではなく make_unique を使用
     soundData.pBuffer = std::make_unique<BYTE[]>(soundData.bufferSize);
     memcpy(soundData.pBuffer.get(), audioData.data(), soundData.bufferSize);
 
@@ -112,7 +107,6 @@ void Audio::LoadAudio(const std::string& filename) {
 }
 
 void Audio::UnloadAudio(SoundData* soundData) {
-    // unique_ptr なので reset() だけで解放されます (delete[] は不要)
     soundData->pBuffer.reset();
     soundData->bufferSize = 0;
     soundData->wfex = {};
@@ -121,12 +115,10 @@ void Audio::UnloadAudio(SoundData* soundData) {
 void Audio::PlayAudio(const std::string& filename) {
     assert(soundDatas_.contains(filename));
 
-    // 過去に生成して再生が終わったVoiceを掃除する (リーク防止)
     for (auto it = sourceVoices_.begin(); it != sourceVoices_.end(); ) {
         XAUDIO2_VOICE_STATE state;
         (*it)->GetState(&state);
         if (state.BuffersQueued == 0) {
-            // 再生キューが空＝再生終了しているなら破棄
             (*it)->DestroyVoice();
             it = sourceVoices_.erase(it);
         } else {
@@ -136,22 +128,19 @@ void Audio::PlayAudio(const std::string& filename) {
 
     const SoundData& soundData = soundDatas_.at(filename);
     HRESULT result;
-
     IXAudio2SourceVoice* pSourceVoice = nullptr;
     result = xAudio2_->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
     assert(SUCCEEDED(result));
 
     XAUDIO2_BUFFER buf{};
-    buf.pAudioData = soundData.pBuffer.get(); // .get() で生ポインタを取得
+    buf.pAudioData = soundData.pBuffer.get();
     buf.AudioBytes = soundData.bufferSize;
     buf.Flags = XAUDIO2_END_OF_STREAM;
 
     result = pSourceVoice->SubmitSourceBuffer(&buf);
     assert(SUCCEEDED(result));
-
     result = pSourceVoice->Start();
     assert(SUCCEEDED(result));
 
-    // 管理セットに追加
     sourceVoices_.insert(pSourceVoice);
 }
