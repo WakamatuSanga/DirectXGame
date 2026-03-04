@@ -10,9 +10,7 @@
 #include "SrvManager.h"
 #include "StringUtility.h"
 
-/// テクスチャマネージャ
 class TextureManager {
-    
     friend struct std::default_delete<TextureManager>;
 
 public:
@@ -38,14 +36,13 @@ private:
         DirectX::TexMetadata metadata;
         Microsoft::WRL::ComPtr<ID3D12Resource> resource;
         Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource;
-        D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU;
-        D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU;
-        uint32_t srvIndex;
+        D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU{};
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU{};
+        uint32_t srvIndex = 0;
     };
 
-    static std::unique_ptr<TextureManager> instance_;
-
     std::vector<TextureData> textureDatas;
+    static std::unique_ptr<TextureManager> instance_;
 
     DirectXCommon* dxCommon_ = nullptr;
     SrvManager* srvManager_ = nullptr;

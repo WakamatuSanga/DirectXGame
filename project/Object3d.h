@@ -2,7 +2,7 @@
 #include "Object3dCommon.h"
 #include "Model.h"
 #include "Matrix4x4.h"
-#include "Camera.h" // 追加
+#include "Camera.h"
 #include <wrl.h>
 #include <d3d12.h>
 
@@ -11,12 +11,15 @@ public:
     struct TransformationMatrix {
         Matrix4x4 WVP;
         Matrix4x4 World;
+        Matrix4x4 WorldInverseTranspose; // 非均一スケール対応
     };
 
     struct DirectionalLight {
         Vector4 color;
         Vector3 direction;
         float intensity;
+        Vector3 cameraPosition; // 鏡面反射用カメラ座標
+        float shininess;        // 光沢度
     };
 
 public:
@@ -25,12 +28,12 @@ public:
     void Draw();
 
     void SetModel(Model* model) { model_ = model; }
-    void SetCamera(Camera* camera) { camera_ = camera; } // カメラセット
+    void SetCamera(Camera* camera) { camera_ = camera; }
 
     void SetScale(const Vector3& scale) { transform_.scale = scale; }
     void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
     void SetTranslate(const Vector3& translate) { transform_.translate = translate; }
-    Transform& GetTransform() { return transform_; } // 参照返し(ImGui用)
+    Transform& GetTransform() { return transform_; }
 
     DirectionalLight* GetDirectionalLightData() { return directionalLightData_; }
 
@@ -41,9 +44,9 @@ private:
 private:
     Object3dCommon* object3dCommon_ = nullptr;
     Model* model_ = nullptr;
-    Camera* camera_ = nullptr; // カメラポインタ
+    Camera* camera_ = nullptr;
 
-    Transform transform_{ {1,1,1}, {0,0,0}, {0,0,0} };
+    Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
     Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_;
     TransformationMatrix* transformationMatrixData_ = nullptr;

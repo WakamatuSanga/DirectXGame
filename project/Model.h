@@ -31,35 +31,32 @@ public:
         Matrix4x4 uvTransform;
     };
 
-public: // メンバ関数
-    // 初期化
+public:
     void Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
 
-    // 描画
+    // 生成済みのModelDataを直接渡す用
+    void Initialize(ModelCommon* modelCommon, const ModelData& modelData);
+
     void Draw();
 
-    // ★追加: 外部からテクスチャを切り替えるための関数
     void SetTextureIndex(uint32_t index) { modelData_.material.textureIndex = index; }
 
-    // ★追加: マテリアルデータへのアクセス（色変更用）
     Material* GetMaterialData() { return materialData_; }
 
-    // 静的関数
     static MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
     static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
-private: // メンバ変数
+    // 三角形ポリゴンで球のモデルデータを生成する関数
+    static ModelData CreateSphereData(uint32_t subdivision = 16);
+
+private:
     ModelCommon* modelCommon_ = nullptr;
+    ModelData modelData_; // 読み込んだデータを保持
 
-    // Objファイルから読み込んだデータ
-    ModelData modelData_;
-
-    // バッファリソース
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
     VertexData* vertexData_ = nullptr;
 
-    // マテリアルリソース
     Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
     Material* materialData_ = nullptr;
 };

@@ -2,19 +2,16 @@
 #include "SceneManager.h"
 #include "TitleScene.h"
 
-// シングルトンの実体
 std::unique_ptr<MyGame> MyGame::instance_ = nullptr;
 
 MyGame* MyGame::GetInstance() {
     if (!instance_) {
-        // privateコンストラクタを呼ぶため new して unique_ptr に渡す
         instance_.reset(new MyGame());
     }
     return instance_.get();
 }
 
 void MyGame::Initialize() {
-    // --- 基盤初期化 (make_unique を使用) ---
     winApp_ = std::make_unique<WinApp>();
     winApp_->Initialize();
 
@@ -48,21 +45,19 @@ void MyGame::Initialize() {
     audio_ = Audio::GetInstance();
     audio_->Initialize();
 
-    // --- 事前ロード ---
+    // 事前ロード
     modelManager_->LoadModel("resources/obj/fence/fence.obj");
+    modelManager_->LoadModel("resources/obj/sphere/sphere.obj");
     texManager_->LoadTexture("resources/obj/fence/fence.png");
     texManager_->LoadTexture("resources/obj/axis/uvChecker.png");
     audio_->LoadAudio("resources/sounds/Alarm01.mp3");
 
-    // --- 最初のシーンをセット (make_unique を使用) ---
     SceneManager::GetInstance()->ChangeScene(std::make_unique<TitleScene>());
 }
 
 void MyGame::Finalize() {
-    // シーンマネージャーの終了
     SceneManager::GetInstance()->Finalize();
 
-    // --- エンジン基盤の終了処理 ---
     texManager_->ReleaseIntermediateResources();
     particleManager_->Finalize();
     imguiManager_->Finalize();

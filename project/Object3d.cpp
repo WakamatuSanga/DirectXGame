@@ -15,18 +15,25 @@ void Object3d::Initialize(Object3dCommon* object3dCommon) {
 }
 
 void Object3d::Update() {
-    // 行列計算
     Matrix4x4 worldMatrix = MakeAffine(transform_.scale, transform_.rotate, transform_.translate);
 
-    // カメラがあればビュープロジェクションを使う
+    // 法線変換用の逆転置行列
+    Matrix4x4 worldInverse = Inverse(worldMatrix);
+    Matrix4x4 worldInverseTranspose = Transpoce(worldInverse);
+
     if (camera_) {
         const Matrix4x4& viewProjection = camera_->GetViewProjectionMatrix();
         transformationMatrixData_->WVP = Multipty(worldMatrix, viewProjection);
+
+        if (directionalLightData_) {
+            directionalLightData_->cameraPosition = camera_->GetTranslate();
+        }
     } else {
-        // カメラ未セット時は単位行列等で代用（またはエラー） 
+        transformationMatrixData_->WVP = MakeIdentity4x4();
     }
 
     transformationMatrixData_->World = worldMatrix;
+    transformationMatrixData_->WorldInverseTranspose = worldInverseTranspose;
 }
 
 void Object3d::Draw() {
@@ -45,6 +52,7 @@ void Object3d::CreateTransformationMatrixResource() {
     transformationMatrixResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
     transformationMatrixData_->WVP = MakeIdentity4x4();
     transformationMatrixData_->World = MakeIdentity4x4();
+    transformationMatrixData_->WorldInverseTranspose = MakeIdentity4x4();
 }
 
 void Object3d::CreateDirectionalLightResource() {
@@ -53,4 +61,6 @@ void Object3d::CreateDirectionalLightResource() {
     directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
     directionalLightData_->intensity = 1.0f;
+    directionalLightData_->cameraPosition = { 0.0f, 0.0f, 0.0f };
+    directionalLightData_->shininess = 50.0f;
 }

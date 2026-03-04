@@ -14,19 +14,21 @@ public:
     void Finalize() override;
 
 private:
-    // --- 自分が所有権を持つデータは unique_ptr ---
     std::unique_ptr<Camera> camera_;
-    std::unique_ptr<Object3d> object3d_;
+    std::unique_ptr<Object3d> object3d_;       // フェンス用
+    std::unique_ptr<Object3d> object3dSphere_; // 球用
     std::unique_ptr<Sprite> debugSprite_;
 
-    // --- 他人が所有しているデータは 生ポインタ (オブザーバー) ---
-    Model* modelFence_ = nullptr; // ModelManagerが所有している
+    Model* modelFence_ = nullptr;
+    Model* modelSphere_ = nullptr;
 
     uint32_t texIndexUvChecker_ = 0;
     uint32_t texIndexFence_ = 0;
+    uint32_t texIndexMonsterBall_ = 0;
 
     int currentModelTexture_ = 1;
     int currentBlendMode_ = 0;
+    int targetObjectIndex_ = 1; // 0=Fence, 1=Sphere
 
     float layoutStartX_ = -1.4f;
     float layoutStartY_ = -0.8f;

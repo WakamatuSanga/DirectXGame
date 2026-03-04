@@ -1,64 +1,68 @@
-#include "Object3d.hlsli"
+struct DirectionalLight
+{
+    float4 color;
+    float3 direction;
+    float intensity;
+    float3 cameraPosition;
+    float shininess;
+};
 
 struct Material
 {
-    float32_t4 color;
-    int32_t enableLighting;
-    float32_t4x4 uvTransform;
+    float4 color;
+    int enableLighting;
+    float4x4 uvTransform;
 };
 
-struct DirecctionalLight
-{
-    float32_t4 color; //!<ライトの色
-    float32_t3 direction; //!< ライトの向き
-    float intensity; //!<輝度
-};
-
-Texture2D<float32_t4> gTexture : register(t0);
-SamplerState gSampler : register(s0);
 ConstantBuffer<Material> gMaterial : register(b0);
-ConstantBuffer<DirecctionalLight> gDirectionalLight : register(b1);
+ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
-struct PixelShaderOutput
+Texture2D<float4> gTexture : register(t0);
+SamplerState gSampler : register(s0);
+
+struct VertexShaderOutput
 {
-    float32_t4 color : SV_Target0;
+    float4 pos : SV_POSITION;
+    float2 uv : TEXCOORD0;
+    float3 normal : NORMAL;
+    float3 worldPos : TEXCOORD1;
 };
 
-
-
-
-PixelShaderOutput main(VertexShaderOutput input)
+float4 main(VertexShaderOutput input) : SV_TARGET
 {
-    PixelShaderOutput output;
-    output.color = gMaterial.color;
-
-     // UV変換
-    float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-
-    float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
-
-    // テクスチャのアルファ値が0.5未満なら、このピクセルを破棄(描画しない)
-    if (textureColor.a < 0.5f)
+    float4 transformedUV = mul(float4(input.uv, 0.0f, 1.0f), gMaterial.uvTransform);
+    float4 texColor = gTexture.Sample(gSampler, transformedUV.xy);
+    
+    // Zバッファの不具合を防ぐため透明な部分は破棄
+    if (texColor.a <= 0.5f)
     {
         discard;
     }
     
-    //Lightingする場合
+    float4 outputColor = gMaterial.color * texColor;
+
     if (gMaterial.enableLighting != 0)
     {
-
-        float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
-        float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
-        output.color.rgb = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-        output.color.a = gMaterial.color.a * textureColor.a;
+        float3 N = normalize(input.normal);
+        float3 L = normalize(-gDirectionalLight.direction);
+        
+        // 拡散反射 (Lambert)
+        float NdotL = saturate(dot(N, L));
+        float3 diffuse = gDirectionalLight.color.rgb * NdotL * gDirectionalLight.intensity;
+        
+        // 鏡面反射 (Blinn-Phong)
+        float3 V = normalize(gDirectionalLight.cameraPosition - input.worldPos);
+        float3 H = normalize(L + V);
+        float NdotH = saturate(dot(N, H));
+        float specularWeight = pow(NdotH, gDirectionalLight.shininess);
+        float3 specular = gDirectionalLight.color.rgb * specularWeight * gDirectionalLight.intensity;
+        
+        // 環境光 (Ambient)
+        float3 ambient = float3(0.1f, 0.1f, 0.1f);
+        
+        // 合成
+        outputColor.rgb = outputColor.rgb * (diffuse + ambient) + specular;
     }
-    else
-    {
 
-        output.color = gMaterial.color * textureColor;
-
-    }
-
-    return output;
-
+    return outputColor;
 }

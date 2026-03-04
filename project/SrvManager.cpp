@@ -54,7 +54,7 @@ void SrvManager::CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResou
 }
 
 void SrvManager::PreDraw() {
-    ID3D12DescriptorHeap* descriptorHeaps[] = { GetSrvDescriptorHeap() };
+    ID3D12DescriptorHeap* descriptorHeaps[] = { dxCommon_->GetSrvDescriptorHeap() };
     dxCommon_->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
 }
 
