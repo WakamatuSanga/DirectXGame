@@ -31,6 +31,7 @@ private:
     uint32_t skyboxTextureIndex_ = 0;
 
     int currentModelTexture_ = 1;
+    int currentParticleTexture_ = 0;
     int currentBlendMode_ = 0;
     int targetObjectIndex_ = 1; // 0=Fence, 1=Sphere
 
@@ -39,6 +40,9 @@ private:
     std::string skyboxTexturePath_ = "resources/skybox/rostock_laage_airport_4k.dds";
     Vector3 skyboxScale_ = { 100.0f, 100.0f, 100.0f };
     Vector3 skyboxTranslate_ = { 0.0f, 0.0f, 0.0f };
+    std::string particleTexturePath_ = "resources/obj/axis/uvChecker.png";
+    bool isSphereEnvironmentMapEnabled_ = true;
+    float sphereEnvironmentMapIntensity_ = 1.0f;
 
     float layoutStartX_ = -1.4f;
     float layoutStartY_ = -0.8f;
