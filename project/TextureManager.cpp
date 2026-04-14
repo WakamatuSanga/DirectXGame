@@ -1,5 +1,7 @@
 #include "TextureManager.h"
 #include <cassert>
+#include <cctype>
+#include <filesystem>
 
 std::unique_ptr<TextureManager> TextureManager::instance_ = nullptr;
 
@@ -42,29 +44,66 @@ void TextureManager::LoadTexture(const std::string& filePath) {
     TextureData& textureData = textureDatas.back();
     textureData.filePath = filePath;
 
-    DirectX::ScratchImage image{};
     std::wstring wFilePath = StringUtility::ConvertString(filePath);
-    HRESULT hr = DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, &textureData.metadata, image);
-    assert(SUCCEEDED(hr));
+    std::string extension = std::filesystem::path(filePath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-    DirectX::ScratchImage mipImages{};
-    hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
-    assert(SUCCEEDED(hr));
+    if (extension == ".dds") {
+        DirectX::ScratchImage ddsImage{};
+        HRESULT hr = DirectX::LoadFromDDSFile(
+            wFilePath.c_str(),
+            DirectX::DDS_FLAGS_NONE,
+            &textureData.metadata,
+            ddsImage);
+        assert(SUCCEEDED(hr));
 
-    textureData.metadata = mipImages.GetMetadata();
-    textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
-    textureData.intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages);
+        textureData.metadata = ddsImage.GetMetadata();
+        textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
+        textureData.intermediateResource = dxCommon_->UploadTextureData(textureData.resource, ddsImage);
+    } else {
+        DirectX::ScratchImage image{};
+        HRESULT hr = DirectX::LoadFromWICFile(
+            wFilePath.c_str(),
+            DirectX::WIC_FLAGS_FORCE_SRGB,
+            &textureData.metadata,
+            image);
+        assert(SUCCEEDED(hr));
+
+        DirectX::ScratchImage mipImages{};
+        hr = DirectX::GenerateMipMaps(
+            image.GetImages(),
+            image.GetImageCount(),
+            image.GetMetadata(),
+            DirectX::TEX_FILTER_SRGB,
+            0,
+            mipImages);
+        assert(SUCCEEDED(hr));
+
+        textureData.metadata = mipImages.GetMetadata();
+        textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
+        textureData.intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages);
+    }
 
     textureData.srvIndex = srvManager_->Allocate();
     textureData.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(textureData.srvIndex);
     textureData.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(textureData.srvIndex);
 
-    srvManager_->CreateSRVforTexture2D(
-        textureData.srvIndex,
-        textureData.resource.Get(),
-        textureData.metadata.format,
-        static_cast<UINT>(textureData.metadata.mipLevels)
-    );
+    if (textureData.metadata.IsCubemap()) {
+        srvManager_->CreateSRVforTextureCube(
+            textureData.srvIndex,
+            textureData.resource.Get(),
+            textureData.metadata.format,
+            static_cast<UINT>(textureData.metadata.mipLevels)
+        );
+    } else {
+        srvManager_->CreateSRVforTexture2D(
+            textureData.srvIndex,
+            textureData.resource.Get(),
+            textureData.metadata.format,
+            static_cast<UINT>(textureData.metadata.mipLevels)
+        );
+    }
 }
 
 void TextureManager::ReleaseIntermediateResources() {

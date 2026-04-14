@@ -6,6 +6,7 @@
 #include "TextureManager.h"
 #include "SpriteCommon.h"
 #include "Object3dCommon.h"
+#include "SkyboxCommon.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
 #include "Input.h"
@@ -29,6 +30,7 @@ public:
     Input* GetInput() const { return input_.get(); } // .get()で生ポインタを返す
     DirectXCommon* GetDxCommon() const { return dxCommon_.get(); }
     Object3dCommon* GetObject3dCommon() const { return object3dCommon_.get(); }
+    SkyboxCommon* GetSkyboxCommon() const { return skyboxCommon_.get(); }
     SpriteCommon* GetSpriteCommon() const { return spriteCommon_.get(); }
 
 private:
@@ -51,6 +53,7 @@ private:
     std::unique_ptr<ImGuiManager> imguiManager_;
     std::unique_ptr<SpriteCommon> spriteCommon_;
     std::unique_ptr<Object3dCommon> object3dCommon_;
+    std::unique_ptr<SkyboxCommon> skyboxCommon_;
     std::unique_ptr<Input> input_;
 
     // --- マネージャーへの参照 (所有権を持たないため 生ポインタ でOK) ---

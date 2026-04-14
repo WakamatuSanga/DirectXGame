@@ -33,6 +33,9 @@ void MyGame::Initialize() {
     object3dCommon_ = std::make_unique<Object3dCommon>();
     object3dCommon_->Initialize(dxCommon_.get());
 
+    skyboxCommon_ = std::make_unique<SkyboxCommon>();
+    skyboxCommon_->Initialize(dxCommon_.get());
+
     modelManager_ = ModelManager::GetInstance();
     modelManager_->Initialize(dxCommon_.get());
 
