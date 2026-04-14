@@ -39,6 +39,8 @@ private:
     std::string skyboxTexturePath_ = "resources/skybox/rostock_laage_airport_4k.dds";
     Vector3 skyboxScale_ = { 100.0f, 100.0f, 100.0f };
     Vector3 skyboxTranslate_ = { 0.0f, 0.0f, 0.0f };
+    bool isSphereEnvironmentMapEnabled_ = true;
+    float sphereEnvironmentMapIntensity_ = 1.0f;
 
     float layoutStartX_ = -1.4f;
     float layoutStartY_ = -0.8f;

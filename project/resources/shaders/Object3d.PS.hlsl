@@ -14,10 +14,19 @@ struct Material
     float4x4 uvTransform;
 };
 
+struct EnvironmentMapData
+{
+    int enableEnvironmentMap;
+    float intensity;
+    float2 padding;
+};
+
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
+ConstantBuffer<EnvironmentMapData> gEnvironmentMapData : register(b2);
 
 Texture2D<float4> gTexture : register(t0);
+TextureCube<float4> gEnvironmentTexture : register(t1);
 SamplerState gSampler : register(s0);
 
 struct VertexShaderOutput
@@ -62,6 +71,15 @@ float4 main(VertexShaderOutput input) : SV_TARGET
         
         // 合成
         outputColor.rgb = outputColor.rgb * (diffuse + ambient) + specular;
+    }
+
+    if (gEnvironmentMapData.enableEnvironmentMap != 0)
+    {
+        float3 N = normalize(input.normal);
+        float3 V = normalize(gDirectionalLight.cameraPosition - input.worldPos);
+        float3 reflection = reflect(-V, N);
+        float3 reflectionColor = gEnvironmentTexture.Sample(gSampler, reflection).rgb;
+        outputColor.rgb = lerp(outputColor.rgb, reflectionColor, saturate(gEnvironmentMapData.intensity));
     }
 
     return outputColor;

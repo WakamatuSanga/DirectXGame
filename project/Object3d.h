@@ -5,8 +5,15 @@
 #include "Camera.h"
 #include <wrl.h>
 #include <d3d12.h>
+#include <cstdint>
 
 class Object3d {
+    struct EnvironmentMapData {
+        int32_t enableEnvironmentMap;
+        float intensity;
+        float padding[2];
+    };
+
 public:
     struct TransformationMatrix {
         Matrix4x4 WVP;
@@ -29,6 +36,9 @@ public:
 
     void SetModel(Model* model) { model_ = model; }
     void SetCamera(Camera* camera) { camera_ = camera; }
+    void SetEnvironmentTextureIndex(uint32_t textureIndex) { environmentTextureIndex_ = textureIndex; }
+    void SetEnvironmentMapEnabled(bool isEnabled) { environmentMapData_->enableEnvironmentMap = isEnabled ? 1 : 0; }
+    void SetEnvironmentMapIntensity(float intensity) { environmentMapData_->intensity = intensity; }
 
     void SetScale(const Vector3& scale) { transform_.scale = scale; }
     void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
@@ -40,6 +50,7 @@ public:
 private:
     void CreateTransformationMatrixResource();
     void CreateDirectionalLightResource();
+    void CreateEnvironmentMapResource();
 
 private:
     Object3dCommon* object3dCommon_ = nullptr;
@@ -53,4 +64,8 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
     DirectionalLight* directionalLightData_ = nullptr;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> environmentMapResource_;
+    EnvironmentMapData* environmentMapData_ = nullptr;
+    uint32_t environmentTextureIndex_ = static_cast<uint32_t>(-1);
 };

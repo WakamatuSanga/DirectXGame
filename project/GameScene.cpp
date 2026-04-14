@@ -41,12 +41,17 @@ void GameScene::Initialize() {
     object3d_->SetModel(modelFence_);
     object3d_->SetTranslate({ -2.0f, 0.0f, 0.0f });
     object3d_->SetCamera(camera_.get());
+    object3d_->SetEnvironmentTextureIndex(skyboxTextureIndex_);
+    object3d_->SetEnvironmentMapEnabled(false);
 
     object3dSphere_ = std::make_unique<Object3d>();
     object3dSphere_->Initialize(object3dCommon);
     object3dSphere_->SetModel(modelSphere_); // 生成した球体をセット
     object3dSphere_->SetTranslate({ 2.0f, 0.0f, 0.0f });
     object3dSphere_->SetCamera(camera_.get());
+    object3dSphere_->SetEnvironmentTextureIndex(skyboxTextureIndex_);
+    object3dSphere_->SetEnvironmentMapEnabled(isSphereEnvironmentMapEnabled_);
+    object3dSphere_->SetEnvironmentMapIntensity(sphereEnvironmentMapIntensity_);
 
     texManager->LoadTexture("resources/obj/axis/uvChecker.png");
     texManager->LoadTexture("resources/obj/fence/fence.png");
@@ -117,6 +122,8 @@ void GameScene::Update() {
     skybox_->SetScale(skyboxScale_);
     skybox_->SetTranslate(skyboxTranslate_);
     skybox_->Update();
+    object3dSphere_->SetEnvironmentMapEnabled(isSphereEnvironmentMapEnabled_);
+    object3dSphere_->SetEnvironmentMapIntensity(sphereEnvironmentMapIntensity_);
     object3d_->Update();
     object3dSphere_->Update();
     debugSprite_->Update();
@@ -158,6 +165,12 @@ void GameScene::Update() {
     ImGui::DragFloat3("Skybox Scale", &skyboxScale_.x, 1.0f, 1.0f, 1000.0f, "%.1f");
     ImGui::TextWrapped("DDS: %s", skyboxTexturePath_.c_str());
     ImGui::Text("TextureIndex: %u", skyboxTextureIndex_);
+
+    ImGui::SeparatorText("Environment Map");
+    ImGui::Checkbox("Reflect Sphere", &isSphereEnvironmentMapEnabled_);
+    ImGui::SliderFloat("Reflect Strength", &sphereEnvironmentMapIntensity_, 0.0f, 1.0f, "%.2f");
+    ImGui::TextWrapped("Cubemap DDS: %s", skyboxTexturePath_.c_str());
+    ImGui::Text("Cubemap TextureIndex: %u", skyboxTextureIndex_);
 
     ImGui::SeparatorText("Target Object Selection");
     ImGui::Combo("Target", &targetObjectIndex_, "Fence\0Sphere\0");
