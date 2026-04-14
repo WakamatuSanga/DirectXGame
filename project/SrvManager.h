@@ -13,6 +13,7 @@ public:
     bool CanAllocate() const;
     void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
     void CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT format, UINT mipLevels);
+    void CreateSRVforTextureCube(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT format, UINT mipLevels);
     void PreDraw();
 
     ID3D12DescriptorHeap* GetSrvDescriptorHeap() const { return dxCommon_->GetSrvDescriptorHeap(); }

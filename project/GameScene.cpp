@@ -27,6 +27,15 @@ void GameScene::Initialize() {
     camera_->SetTranslate({ 0.0f, 2.0f, -10.0f });
     camera_->SetRotate({ 0.1f, 0.0f, 0.0f });
 
+    skybox_ = std::make_unique<Skybox>();
+    skybox_->Initialize(MyGame::GetInstance()->GetSkyboxCommon());
+    skybox_->SetCamera(camera_.get());
+    skybox_->SetScale(skyboxScale_);
+    skybox_->SetTexture(skyboxTexturePath_);
+    skyboxTextureIndex_ = texManager->GetTextureIndexByFilePath(skyboxTexturePath_);
+    skyboxTranslate_ = camera_->GetTranslate();
+    skybox_->SetTranslate(skyboxTranslate_);
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCommon);
     object3d_->SetModel(modelFence_);
@@ -101,6 +110,13 @@ void GameScene::Update() {
     if (input->PushKey(DIK_0)) audio->PlayAudio("resources/sounds/Alarm01.mp3");
 
     camera_->Update();
+    if (isSkyboxFollowCamera_) {
+        skyboxTranslate_ = camera_->GetTranslate();
+    }
+    skybox_->SetCamera(camera_.get());
+    skybox_->SetScale(skyboxScale_);
+    skybox_->SetTranslate(skyboxTranslate_);
+    skybox_->Update();
     object3d_->Update();
     object3dSphere_->Update();
     debugSprite_->Update();
@@ -135,6 +151,13 @@ void GameScene::Update() {
     ImGui::SeparatorText("Camera");
     Vector3 camTrans = camera_->GetTranslate();
     if (ImGui::DragFloat3("Cam Pos", &camTrans.x, 0.1f)) camera_->SetTranslate(camTrans);
+
+    ImGui::SeparatorText("Skybox");
+    ImGui::Checkbox("Show Skybox", &isSkyboxVisible_);
+    ImGui::Checkbox("Follow Camera", &isSkyboxFollowCamera_);
+    ImGui::DragFloat3("Skybox Scale", &skyboxScale_.x, 1.0f, 1.0f, 1000.0f, "%.1f");
+    ImGui::TextWrapped("DDS: %s", skyboxTexturePath_.c_str());
+    ImGui::Text("TextureIndex: %u", skyboxTextureIndex_);
 
     ImGui::SeparatorText("Target Object Selection");
     ImGui::Combo("Target", &targetObjectIndex_, "Fence\0Sphere\0");
@@ -184,8 +207,14 @@ void GameScene::Update() {
 
 void GameScene::Draw() {
     auto object3dCommon = MyGame::GetInstance()->GetObject3dCommon();
+    auto skyboxCommon = MyGame::GetInstance()->GetSkyboxCommon();
     auto particleManager = ParticleManager::GetInstance();
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
+
+    if (isSkyboxVisible_) {
+        skyboxCommon->CommonDrawSetting();
+        skybox_->Draw();
+    }
 
     object3dCommon->CommonDrawSetting((Object3dCommon::BlendMode)currentBlendMode_);
 
