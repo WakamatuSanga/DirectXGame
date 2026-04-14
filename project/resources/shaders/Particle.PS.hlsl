@@ -2,7 +2,7 @@
 
 // C++のRootParameter[1] (Texture) を受け取る
 // register(t0) はピクセルシェーダーでのみ見えるように設定されているので、VSのt0と被ってもOK
-Texture2D<float32_t4> gTexture : register(t0);
+Texture2D<float32_t4> gTexture : register(t1);
 SamplerState gSampler : register(s0);
 
 struct PixelShaderOutput

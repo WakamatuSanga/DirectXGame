@@ -15,6 +15,7 @@
 void GameScene::Initialize() {
     auto modelManager = ModelManager::GetInstance();
     auto texManager = TextureManager::GetInstance();
+    auto particleManager = ParticleManager::GetInstance();
     auto object3dCommon = MyGame::GetInstance()->GetObject3dCommon();
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
 
@@ -56,6 +57,7 @@ void GameScene::Initialize() {
     texManager->LoadTexture("resources/obj/axis/uvChecker.png");
     texManager->LoadTexture("resources/obj/fence/fence.png");
     texManager->LoadTexture("resources/obj/monsterBall/monsterBall.png");
+    texManager->LoadTexture("resources/particle/circle2.png");
 
     texIndexUvChecker_ = texManager->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
     texIndexFence_ = texManager->GetTextureIndexByFilePath("resources/obj/fence/fence.png");
@@ -71,6 +73,8 @@ void GameScene::Initialize() {
     debugSprite_->SetTexture("resources/obj/axis/uvChecker.png");
     debugSprite_->SetPosition({ 100.0f, 100.0f });
     debugSprite_->SetSize({ 100.0f, 100.0f });
+
+    particleManager->SetTexture(particleTexturePath_);
 }
 
 void GameScene::Finalize() {}
@@ -78,6 +82,9 @@ void GameScene::Finalize() {}
 void GameScene::Update() {
     auto input = MyGame::GetInstance()->GetInput();
     auto particleManager = ParticleManager::GetInstance();
+    auto& hitEffectParams = particleManager->GetHitEffectParams();
+    auto& fireballEffectParams = particleManager->GetFireballEffectParams();
+    auto& windEffectParams = particleManager->GetWindEffectParams();
     auto audio = Audio::GetInstance();
     auto texManager = TextureManager::GetInstance();
 
@@ -129,18 +136,15 @@ void GameScene::Update() {
     debugSprite_->Update();
 
     if (input->PushKey(DIK_SPACE)) {
-        particleManager->Emit("resources/obj/axis/uvChecker.png", { 0,0,0 }, 2);
+        particleManager->Emit("Hit", object3dSphere_->GetTransform().translate, hitEffectParams.spawnCount);
     }
-#ifdef _DEBUG
-    if (!ImGui::GetIO().WantCaptureMouse && input->MouseTrigger(Input::MouseLeft)) {
-#else
-    if (input->MouseTrigger(Input::MouseLeft)) {
-#endif
-        Vector3 pos = camera_->GetTranslate();
-        Vector3 rot = camera_->GetRotate();
-        pos.x += std::sin(rot.y) * 5.0f;
-        pos.z += std::cos(rot.y) * 5.0f;
-        particleManager->Emit("resources/obj/axis/uvChecker.png", pos, 10);
+
+    if (input->PushKey(DIK_H)) {
+        particleManager->Emit("Hit", object3dSphere_->GetTransform().translate, hitEffectParams.spawnCount);
+    }
+
+    if (input->TriggerKey(DIK_P)) {
+        particleManager->Emit(particleTexturePath_, object3dSphere_->GetTransform().translate, 1);
     }
 
     particleManager->Update(camera_.get());
@@ -152,6 +156,37 @@ void GameScene::Update() {
     ImGui::DragFloat2("Sprite Pos", &spritePos.x, 1.0f, -9999.0f, 9999.0f, "%4.1f");
     debugSprite_->SetPosition(spritePos);
     ImGui::End();
+
+    auto DrawEffectParamsUI = [](const char* label, ParticleManager::EffectParams& params) {
+        std::string prefix = label;
+
+        int spawnCount = static_cast<int>(params.spawnCount);
+        if (ImGui::DragInt((prefix + " Spawn Count").c_str(), &spawnCount, 1.0f, 1, 100)) {
+            if (spawnCount < 1) {
+                spawnCount = 1;
+            }
+            params.spawnCount = static_cast<uint32_t>(spawnCount);
+        }
+
+        ImGui::DragFloat2((prefix + " Scale X").c_str(), &params.scaleXRange.x, 0.01f, 0.01f, 4.0f, "%.2f");
+        ImGui::DragFloat2((prefix + " Scale Y").c_str(), &params.scaleYRange.x, 0.01f, 0.01f, 6.0f, "%.2f");
+        ImGui::DragFloat2((prefix + " Lifetime").c_str(), &params.lifeTimeRange.x, 0.01f, 0.01f, 3.0f, "%.2f");
+        ImGui::DragFloat2((prefix + " Speed").c_str(), &params.speedRange.x, 0.01f, 0.0f, 1.0f, "%.2f");
+        ImGui::DragFloat2((prefix + " Rotate Z").c_str(), &params.rotateZRange.x, 0.01f, -6.29f, 6.29f, "%.2f");
+
+        Vector3 colorMin = { params.colorRRange.x, params.colorGRange.x, params.colorBRange.x };
+        Vector3 colorMax = { params.colorRRange.y, params.colorGRange.y, params.colorBRange.y };
+        if (ImGui::ColorEdit3((prefix + " Color Min").c_str(), &colorMin.x)) {
+            params.colorRRange.x = colorMin.x;
+            params.colorGRange.x = colorMin.y;
+            params.colorBRange.x = colorMin.z;
+        }
+        if (ImGui::ColorEdit3((prefix + " Color Max").c_str(), &colorMax.x)) {
+            params.colorRRange.y = colorMax.x;
+            params.colorGRange.y = colorMax.y;
+            params.colorBRange.y = colorMax.z;
+        }
+        };
 
     ImGui::Begin("Game Scene Menu");
     ImGui::Text("Press [T] to return to Title");
@@ -171,6 +206,48 @@ void GameScene::Update() {
     ImGui::SliderFloat("Reflect Strength", &sphereEnvironmentMapIntensity_, 0.0f, 1.0f, "%.2f");
     ImGui::TextWrapped("Cubemap DDS: %s", skyboxTexturePath_.c_str());
     ImGui::Text("Cubemap TextureIndex: %u", skyboxTextureIndex_);
+
+    ImGui::SeparatorText("Particle Texture");
+    const char* particleTextureNames[] = { "uvChecker", "Circle2", "Fence" };
+    const char* particleTexturePaths[] = {
+        "resources/obj/axis/uvChecker.png",
+        "resources/particle/circle2.png",
+        "resources/obj/fence/fence.png"
+    };
+    if (ImGui::Combo("Particle Texture", &currentParticleTexture_, particleTextureNames, IM_ARRAYSIZE(particleTextureNames))) {
+        particleTexturePath_ = particleTexturePaths[currentParticleTexture_];
+        particleManager->SetTexture(particleTexturePath_);
+    }
+    ImGui::TextWrapped("Particle Texture Path: %s", particleTexturePath_.c_str());
+
+    ImGui::SeparatorText("Emit Effects");
+    if (ImGui::Button("Emit Hit")) {
+        particleManager->Emit("Hit", object3dSphere_->GetTransform().translate, hitEffectParams.spawnCount);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Emit Fireball")) {
+        particleManager->Emit("Fireball", object3dSphere_->GetTransform().translate, fireballEffectParams.spawnCount);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Emit Wind")) {
+        particleManager->Emit("Wind", object3dSphere_->GetTransform().translate, windEffectParams.spawnCount);
+    }
+    ImGui::Text("Hit Trigger: [Space] / [H]");
+
+    ImGui::SeparatorText("Hit Params");
+    DrawEffectParamsUI("Hit", hitEffectParams);
+
+    ImGui::SeparatorText("Fireball Params");
+    DrawEffectParamsUI("Fireball", fireballEffectParams);
+
+    ImGui::SeparatorText("Wind Params");
+    DrawEffectParamsUI("Wind", windEffectParams);
+
+    ImGui::SeparatorText("Particle Smoke Test");
+    if (ImGui::Button("Emit Basic Particle")) {
+        particleManager->Emit(particleTexturePath_, object3dSphere_->GetTransform().translate, 1);
+    }
+    ImGui::Text("Trigger: [P]");
 
     ImGui::SeparatorText("Target Object Selection");
     ImGui::Combo("Target", &targetObjectIndex_, "Fence\0Sphere\0");
