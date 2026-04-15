@@ -68,6 +68,34 @@ void GameScene::Initialize() {
         modelSphere_->SetTextureIndex(texIndexMonsterBall_);
     }
 
+    primitivePreviewObjects_.clear();
+    primitivePreviewObjects_.reserve(8);
+
+    auto createPrimitivePreview = [&](Model* model, const Vector3& translate, const Vector3& rotate, const Vector3& scale) {
+        if (!model) {
+            return;
+        }
+
+        auto preview = std::make_unique<Object3d>();
+        preview->Initialize(object3dCommon);
+        preview->SetModel(model);
+        preview->SetCamera(camera_.get());
+        preview->SetTranslate(translate);
+            preview->SetRotate(rotate);
+        preview->SetScale(scale);
+        preview->SetEnvironmentMapEnabled(false);
+        primitivePreviewObjects_.push_back(std::move(preview));
+        };
+
+    createPrimitivePreview(modelManager->CreatePlane("PrimitivePlane"), { -4.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.4f, 1.4f, 1.4f });
+    createPrimitivePreview(modelManager->CreateCircle("PrimitiveCircle", 32), { -1.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.2f, 1.2f, 1.2f });
+    createPrimitivePreview(modelManager->CreateRing("PrimitiveRing", 32, 0.45f, 1.0f), { 1.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.2f, 1.2f, 1.2f });
+    createPrimitivePreview(modelManager->CreateTriangle("PrimitiveTriangle"), { 4.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.4f, 1.4f, 1.4f });
+    createPrimitivePreview(modelManager->CreateBox("PrimitiveBox"), { -4.5f, 0.9f, 6.0f }, { 0.35f, 0.45f, 0.0f }, { 0.9f, 0.9f, 0.9f });
+    createPrimitivePreview(modelManager->CreateCylinder("PrimitiveCylinder", 32), { -1.5f, 0.9f, 6.0f }, { 0.1f, 0.35f, 0.0f }, { 0.85f, 0.85f, 0.85f });
+    createPrimitivePreview(modelManager->CreateCone("PrimitiveCone", 32), { 1.5f, 0.9f, 6.0f }, { 0.1f, 0.35f, 0.0f }, { 0.85f, 0.85f, 0.85f });
+    createPrimitivePreview(modelManager->CreateTorus("PrimitiveTorus", 32, 16), { 4.5f, 0.9f, 6.0f }, { 0.6f, 0.3f, 0.0f }, { 1.0f, 1.0f, 1.0f });
+
     debugSprite_ = std::make_unique<Sprite>();
     debugSprite_->Initialize(spriteCommon);
     debugSprite_->SetTexture("resources/obj/axis/uvChecker.png");
@@ -133,6 +161,9 @@ void GameScene::Update() {
     object3dSphere_->SetEnvironmentMapIntensity(sphereEnvironmentMapIntensity_);
     object3d_->Update();
     object3dSphere_->Update();
+    for (auto& primitivePreviewObject : primitivePreviewObjects_) {
+        primitivePreviewObject->Update();
+    }
     debugSprite_->Update();
 
     if (input->PushKey(DIK_SPACE)) {
@@ -207,6 +238,11 @@ void GameScene::Update() {
     ImGui::TextWrapped("Cubemap DDS: %s", skyboxTexturePath_.c_str());
     ImGui::Text("Cubemap TextureIndex: %u", skyboxTextureIndex_);
 
+    ImGui::SeparatorText("Primitive Preview");
+    ImGui::Checkbox("Show Primitive Preview", &isPrimitivePreviewVisible_);
+    ImGui::Text("Front Row : Plane / Circle / Ring / Triangle");
+    ImGui::Text("Back Row  : Box / Cylinder / Cone / Torus");
+
     ImGui::SeparatorText("Particle Texture");
     const char* particleTextureNames[] = { "uvChecker", "Circle2", "Fence" };
     const char* particleTexturePaths[] = {
@@ -220,28 +256,31 @@ void GameScene::Update() {
     }
     ImGui::TextWrapped("Particle Texture Path: %s", particleTexturePath_.c_str());
 
-    ImGui::SeparatorText("Emit Effects");
+    ImGui::SeparatorText("Hit Effect");
+    ImGui::TextWrapped("Main submission target: plane billboard particles stretched into hit streaks.");
     if (ImGui::Button("Emit Hit")) {
         particleManager->Emit("Hit", object3dSphere_->GetTransform().translate, hitEffectParams.spawnCount);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Emit Fireball")) {
-        particleManager->Emit("Fireball", object3dSphere_->GetTransform().translate, fireballEffectParams.spawnCount);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Emit Wind")) {
-        particleManager->Emit("Wind", object3dSphere_->GetTransform().translate, windEffectParams.spawnCount);
     }
     ImGui::Text("Hit Trigger: [Space] / [H]");
 
     ImGui::SeparatorText("Hit Params");
     DrawEffectParamsUI("Hit", hitEffectParams);
 
-    ImGui::SeparatorText("Fireball Params");
-    DrawEffectParamsUI("Fireball", fireballEffectParams);
+    if (ImGui::CollapsingHeader("Other Effects (Optional)")) {
+        if (ImGui::Button("Emit Fireball")) {
+            particleManager->Emit("Fireball", object3dSphere_->GetTransform().translate, fireballEffectParams.spawnCount);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Emit Wind")) {
+            particleManager->Emit("Wind", object3dSphere_->GetTransform().translate, windEffectParams.spawnCount);
+        }
 
-    ImGui::SeparatorText("Wind Params");
-    DrawEffectParamsUI("Wind", windEffectParams);
+        ImGui::SeparatorText("Fireball Params");
+        DrawEffectParamsUI("Fireball", fireballEffectParams);
+
+        ImGui::SeparatorText("Wind Params");
+        DrawEffectParamsUI("Wind", windEffectParams);
+    }
 
     ImGui::SeparatorText("Particle Smoke Test");
     if (ImGui::Button("Emit Basic Particle")) {
@@ -310,6 +349,11 @@ void GameScene::Draw() {
 
     object3d_->Draw();
     object3dSphere_->Draw();
+    if (isPrimitivePreviewVisible_) {
+        for (auto& primitivePreviewObject : primitivePreviewObjects_) {
+            primitivePreviewObject->Draw();
+        }
+    }
 
     particleManager->Draw();
 

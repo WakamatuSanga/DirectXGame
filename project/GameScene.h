@@ -7,6 +7,7 @@
 #include "Sprite.h"
 #include <memory>
 #include <string>
+#include <vector>
 
 class GameScene : public IScene {
 public:
@@ -21,6 +22,7 @@ private:
     std::unique_ptr<Object3d> object3d_;       // フェンス用
     std::unique_ptr<Object3d> object3dSphere_; // 球用
     std::unique_ptr<Sprite> debugSprite_;
+    std::vector<std::unique_ptr<Object3d>> primitivePreviewObjects_;
 
     Model* modelFence_ = nullptr;
     Model* modelSphere_ = nullptr;
@@ -43,6 +45,7 @@ private:
     std::string particleTexturePath_ = "resources/obj/axis/uvChecker.png";
     bool isSphereEnvironmentMapEnabled_ = true;
     float sphereEnvironmentMapIntensity_ = 1.0f;
+    bool isPrimitivePreviewVisible_ = true;
 
     float layoutStartX_ = -1.4f;
     float layoutStartY_ = -0.8f;

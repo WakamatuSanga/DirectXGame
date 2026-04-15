@@ -56,13 +56,57 @@ Model* ModelManager::FindModel(const std::string& filePath)
 
 Model* ModelManager::CreateSphere(const std::string& keyName, uint32_t subdivision)
 {
+    return CreatePrimitive(keyName, Model::CreateSphereData(subdivision));
+}
+
+Model* ModelManager::CreatePlane(const std::string& keyName)
+{
+    return CreatePrimitive(keyName, Model::CreatePlaneData());
+}
+
+Model* ModelManager::CreateCircle(const std::string& keyName, uint32_t subdivision)
+{
+    return CreatePrimitive(keyName, Model::CreateCircleData(subdivision));
+}
+
+Model* ModelManager::CreateRing(const std::string& keyName, uint32_t subdivision, float innerRadius, float outerRadius)
+{
+    return CreatePrimitive(keyName, Model::CreateRingData(subdivision, innerRadius, outerRadius));
+}
+
+Model* ModelManager::CreateTorus(const std::string& keyName, uint32_t majorSubdivision, uint32_t minorSubdivision)
+{
+    return CreatePrimitive(keyName, Model::CreateTorusData(majorSubdivision, minorSubdivision));
+}
+
+Model* ModelManager::CreateCylinder(const std::string& keyName, uint32_t subdivision)
+{
+    return CreatePrimitive(keyName, Model::CreateCylinderData(subdivision));
+}
+
+Model* ModelManager::CreateCone(const std::string& keyName, uint32_t subdivision)
+{
+    return CreatePrimitive(keyName, Model::CreateConeData(subdivision));
+}
+
+Model* ModelManager::CreateTriangle(const std::string& keyName)
+{
+    return CreatePrimitive(keyName, Model::CreateTriangleData());
+}
+
+Model* ModelManager::CreateBox(const std::string& keyName)
+{
+    return CreatePrimitive(keyName, Model::CreateBoxData());
+}
+
+Model* ModelManager::CreatePrimitive(const std::string& keyName, const Model::ModelData& modelData)
+{
     if (models_.contains(keyName)) {
         return models_.at(keyName).get();
     }
 
     std::unique_ptr<Model> model = std::make_unique<Model>();
-    Model::ModelData data = Model::CreateSphereData(subdivision);
-    model->Initialize(modelCommon_.get(), data);
+    model->Initialize(modelCommon_.get(), modelData);
 
     models_.insert(std::make_pair(keyName, std::move(model)));
     return models_.at(keyName).get();

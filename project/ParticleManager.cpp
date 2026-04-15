@@ -163,6 +163,8 @@ void ParticleManager::Emit(const std::string& name, const Vector3& pos, uint32_t
     if (name == "Hit") {
         uint32_t emitCount = count > 0 ? count : hitEffectParams_.spawnCount;
         for (uint32_t i = 0; i < emitCount; ++i) {
+            // Plane billboard particles are stretched into short-lived streaks
+            // and emitted radially to form the assignment-style hit effect.
             Vector3 direction = RandomUnitDirection();
             float speed = RandomRange(hitEffectParams_.speedRange.x, hitEffectParams_.speedRange.y);
             PushParticle(
@@ -365,6 +367,7 @@ void ParticleManager::CreateModel() {
     VertexData* vertexData = nullptr;
     vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
+    // Particles use a procedurally generated plane quad and face the camera in Update().
     vertexData[0] = { {-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}, {0,0,-1} };
     vertexData[1] = { {-0.5f,  0.5f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0,0,-1} };
     vertexData[2] = { { 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}, {0,0,-1} };

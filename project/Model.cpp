@@ -8,6 +8,52 @@
 using namespace std;
 using namespace MatrixMath;
 
+namespace {
+    constexpr float kPi = 3.14159265359f;
+
+    uint32_t GetPrimitiveTextureIndex() {
+        return TextureManager::GetInstance()->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
+    }
+
+    Vector3 SubtractVector(const Vector3& v1, const Vector3& v2) {
+        return { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
+    }
+
+    float Length(const Vector3& v) {
+        return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    }
+
+    Vector3 Normalize(const Vector3& v, const Vector3& fallback = { 0.0f, 1.0f, 0.0f }) {
+        float length = Length(v);
+        if (length <= 0.00001f) {
+            return fallback;
+        }
+        return { v.x / length, v.y / length, v.z / length };
+    }
+
+    Model::VertexData MakeVertex(float x, float y, float z, float u, float v, float nx, float ny, float nz) {
+        return { {x, y, z, 1.0f}, {u, v}, {nx, ny, nz} };
+    }
+
+    void PushTriangle(Model::ModelData& data,
+        const Model::VertexData& v0,
+        const Model::VertexData& v1,
+        const Model::VertexData& v2) {
+        data.vertices.push_back(v0);
+        data.vertices.push_back(v1);
+        data.vertices.push_back(v2);
+    }
+
+    void PushQuad(Model::ModelData& data,
+        const Model::VertexData& v00,
+        const Model::VertexData& v01,
+        const Model::VertexData& v10,
+        const Model::VertexData& v11) {
+        PushTriangle(data, v00, v01, v10);
+        PushTriangle(data, v01, v11, v10);
+    }
+}
+
 void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename) {
     ModelData data = LoadObjFile(directoryPath, filename);
     Initialize(modelCommon, data);
@@ -54,13 +100,12 @@ Model::ModelData Model::CreateSphereData(uint32_t subdivision) {
     ModelData data;
 
     // ★修正: 初期値として、確実に存在する「uvChecker.png」のインデックスを取得してセットしておく
-    data.material.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
-
-    const float pi = 3.14159265359f;
+    subdivision = (subdivision < 3) ? 3 : subdivision;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
 
     for (uint32_t lat = 0; lat < subdivision; ++lat) {
-        float latAngle0 = pi * (float)lat / subdivision;
-        float latAngle1 = pi * (float)(lat + 1) / subdivision;
+        float latAngle0 = kPi * static_cast<float>(lat) / static_cast<float>(subdivision);
+        float latAngle1 = kPi * static_cast<float>(lat + 1) / static_cast<float>(subdivision);
 
         float y0 = std::cos(latAngle0);
         float r0 = std::sin(latAngle0);
@@ -68,27 +113,282 @@ Model::ModelData Model::CreateSphereData(uint32_t subdivision) {
         float r1 = std::sin(latAngle1);
 
         for (uint32_t lon = 0; lon < subdivision; ++lon) {
-            float lonAngle0 = 2.0f * pi * (float)lon / subdivision;
-            float lonAngle1 = 2.0f * pi * (float)(lon + 1) / subdivision;
+            float lonAngle0 = 2.0f * kPi * static_cast<float>(lon) / static_cast<float>(subdivision);
+            float lonAngle1 = 2.0f * kPi * static_cast<float>(lon + 1) / static_cast<float>(subdivision);
 
-            float u0 = (float)lon / subdivision;
-            float u1 = (float)(lon + 1) / subdivision;
-            float v0 = (float)lat / subdivision;
-            float v1 = (float)(lat + 1) / subdivision;
+            float u0 = static_cast<float>(lon) / static_cast<float>(subdivision);
+            float u1 = static_cast<float>(lon + 1) / static_cast<float>(subdivision);
+            float v0 = static_cast<float>(lat) / static_cast<float>(subdivision);
+            float v1 = static_cast<float>(lat + 1) / static_cast<float>(subdivision);
 
             VertexData v00 = { {r0 * std::cos(lonAngle0), y0, r0 * std::sin(lonAngle0), 1.0f}, {u0, v0}, {r0 * std::cos(lonAngle0), y0, r0 * std::sin(lonAngle0)} };
             VertexData v10 = { {r1 * std::cos(lonAngle0), y1, r1 * std::sin(lonAngle0), 1.0f}, {u0, v1}, {r1 * std::cos(lonAngle0), y1, r1 * std::sin(lonAngle0)} };
             VertexData v01 = { {r0 * std::cos(lonAngle1), y0, r0 * std::sin(lonAngle1), 1.0f}, {u1, v0}, {r0 * std::cos(lonAngle1), y0, r0 * std::sin(lonAngle1)} };
             VertexData v11 = { {r1 * std::cos(lonAngle1), y1, r1 * std::sin(lonAngle1), 1.0f}, {u1, v1}, {r1 * std::cos(lonAngle1), y1, r1 * std::sin(lonAngle1)} };
 
-            data.vertices.push_back(v00);
-            data.vertices.push_back(v01);
-            data.vertices.push_back(v10);
-            data.vertices.push_back(v01);
-            data.vertices.push_back(v11);
-            data.vertices.push_back(v10);
+            PushQuad(data, v00, v01, v10, v11);
         }
     }
+    return data;
+}
+
+Model::ModelData Model::CreatePlaneData() {
+    ModelData data;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    const Vector3 normal = { 0.0f, 1.0f, 0.0f };
+    PushQuad(data,
+        MakeVertex(-1.0f, 0.0f, 1.0f, 0.0f, 0.0f, normal.x, normal.y, normal.z),
+        MakeVertex(1.0f, 0.0f, 1.0f, 1.0f, 0.0f, normal.x, normal.y, normal.z),
+        MakeVertex(-1.0f, 0.0f, -1.0f, 0.0f, 1.0f, normal.x, normal.y, normal.z),
+        MakeVertex(1.0f, 0.0f, -1.0f, 1.0f, 1.0f, normal.x, normal.y, normal.z));
+
+    return data;
+}
+
+Model::ModelData Model::CreateCircleData(uint32_t subdivision) {
+    ModelData data;
+    subdivision = (subdivision < 3) ? 3 : subdivision;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    for (uint32_t i = 0; i < subdivision; ++i) {
+        float angle0 = 2.0f * kPi * static_cast<float>(i) / static_cast<float>(subdivision);
+        float angle1 = 2.0f * kPi * static_cast<float>(i + 1) / static_cast<float>(subdivision);
+
+        float x0 = std::cos(angle0);
+        float z0 = std::sin(angle0);
+        float x1 = std::cos(angle1);
+        float z1 = std::sin(angle1);
+
+        VertexData center = MakeVertex(0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f);
+        VertexData v0 = MakeVertex(x0, 0.0f, z0, x0 * 0.5f + 0.5f, -z0 * 0.5f + 0.5f, 0.0f, 1.0f, 0.0f);
+        VertexData v1 = MakeVertex(x1, 0.0f, z1, x1 * 0.5f + 0.5f, -z1 * 0.5f + 0.5f, 0.0f, 1.0f, 0.0f);
+        PushTriangle(data, center, v1, v0);
+    }
+
+    return data;
+}
+
+Model::ModelData Model::CreateRingData(uint32_t subdivision, float innerRadius, float outerRadius) {
+    ModelData data;
+    subdivision = (subdivision < 3) ? 3 : subdivision;
+    if (innerRadius < 0.0f) {
+        innerRadius = 0.0f;
+    }
+    if (outerRadius <= innerRadius) {
+        outerRadius = innerRadius + 0.5f;
+    }
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    for (uint32_t i = 0; i < subdivision; ++i) {
+        float angle0 = 2.0f * kPi * static_cast<float>(i) / static_cast<float>(subdivision);
+        float angle1 = 2.0f * kPi * static_cast<float>(i + 1) / static_cast<float>(subdivision);
+
+        float outerX0 = std::cos(angle0) * outerRadius;
+        float outerZ0 = std::sin(angle0) * outerRadius;
+        float outerX1 = std::cos(angle1) * outerRadius;
+        float outerZ1 = std::sin(angle1) * outerRadius;
+        float innerX0 = std::cos(angle0) * innerRadius;
+        float innerZ0 = std::sin(angle0) * innerRadius;
+        float innerX1 = std::cos(angle1) * innerRadius;
+        float innerZ1 = std::sin(angle1) * innerRadius;
+
+        auto MakeRingVertex = [outerRadius](float x, float z) {
+            return MakeVertex(
+                x, 0.0f, z,
+                x / (outerRadius * 2.0f) + 0.5f,
+                -z / (outerRadius * 2.0f) + 0.5f,
+                0.0f, 1.0f, 0.0f);
+            };
+
+        PushQuad(data,
+            MakeRingVertex(innerX0, innerZ0),
+            MakeRingVertex(outerX0, outerZ0),
+            MakeRingVertex(innerX1, innerZ1),
+            MakeRingVertex(outerX1, outerZ1));
+    }
+
+    return data;
+}
+
+Model::ModelData Model::CreateTorusData(uint32_t majorSubdivision, uint32_t minorSubdivision, float majorRadius, float minorRadius) {
+    ModelData data;
+    majorSubdivision = (majorSubdivision < 3) ? 3 : majorSubdivision;
+    minorSubdivision = (minorSubdivision < 3) ? 3 : minorSubdivision;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    auto MakeTorusVertex = [majorRadius, minorRadius](float theta, float phi, float u, float v) {
+        float cosTheta = std::cos(theta);
+        float sinTheta = std::sin(theta);
+        float cosPhi = std::cos(phi);
+        float sinPhi = std::sin(phi);
+        float radius = majorRadius + minorRadius * cosPhi;
+
+        float x = radius * cosTheta;
+        float y = minorRadius * sinPhi;
+        float z = radius * sinTheta;
+        Vector3 normal = Normalize({ cosPhi * cosTheta, sinPhi, cosPhi * sinTheta }, { 0.0f, 1.0f, 0.0f });
+        return MakeVertex(x, y, z, u, v, normal.x, normal.y, normal.z);
+        };
+
+    for (uint32_t major = 0; major < majorSubdivision; ++major) {
+        float theta0 = 2.0f * kPi * static_cast<float>(major) / static_cast<float>(majorSubdivision);
+        float theta1 = 2.0f * kPi * static_cast<float>(major + 1) / static_cast<float>(majorSubdivision);
+        float u0 = static_cast<float>(major) / static_cast<float>(majorSubdivision);
+        float u1 = static_cast<float>(major + 1) / static_cast<float>(majorSubdivision);
+
+        for (uint32_t minor = 0; minor < minorSubdivision; ++minor) {
+            float phi0 = 2.0f * kPi * static_cast<float>(minor) / static_cast<float>(minorSubdivision);
+            float phi1 = 2.0f * kPi * static_cast<float>(minor + 1) / static_cast<float>(minorSubdivision);
+            float v0 = static_cast<float>(minor) / static_cast<float>(minorSubdivision);
+            float v1 = static_cast<float>(minor + 1) / static_cast<float>(minorSubdivision);
+
+            PushQuad(data,
+                MakeTorusVertex(theta0, phi0, u0, v0),
+                MakeTorusVertex(theta1, phi0, u1, v0),
+                MakeTorusVertex(theta0, phi1, u0, v1),
+                MakeTorusVertex(theta1, phi1, u1, v1));
+        }
+    }
+
+    return data;
+}
+
+Model::ModelData Model::CreateCylinderData(uint32_t subdivision, float radius, float height) {
+    ModelData data;
+    subdivision = (subdivision < 3) ? 3 : subdivision;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    float halfHeight = height * 0.5f;
+
+    for (uint32_t i = 0; i < subdivision; ++i) {
+        float angle0 = 2.0f * kPi * static_cast<float>(i) / static_cast<float>(subdivision);
+        float angle1 = 2.0f * kPi * static_cast<float>(i + 1) / static_cast<float>(subdivision);
+
+        float x0 = std::cos(angle0) * radius;
+        float z0 = std::sin(angle0) * radius;
+        float x1 = std::cos(angle1) * radius;
+        float z1 = std::sin(angle1) * radius;
+        float u0 = static_cast<float>(i) / static_cast<float>(subdivision);
+        float u1 = static_cast<float>(i + 1) / static_cast<float>(subdivision);
+
+        Vector3 normal0 = Normalize({ std::cos(angle0), 0.0f, std::sin(angle0) }, { 1.0f, 0.0f, 0.0f });
+        Vector3 normal1 = Normalize({ std::cos(angle1), 0.0f, std::sin(angle1) }, { 1.0f, 0.0f, 0.0f });
+
+        PushQuad(data,
+            MakeVertex(x0, halfHeight, z0, u0, 0.0f, normal0.x, normal0.y, normal0.z),
+            MakeVertex(x1, halfHeight, z1, u1, 0.0f, normal1.x, normal1.y, normal1.z),
+            MakeVertex(x0, -halfHeight, z0, u0, 1.0f, normal0.x, normal0.y, normal0.z),
+            MakeVertex(x1, -halfHeight, z1, u1, 1.0f, normal1.x, normal1.y, normal1.z));
+
+        VertexData topCenter = MakeVertex(0.0f, halfHeight, 0.0f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f);
+        VertexData top0 = MakeVertex(x0, halfHeight, z0, x0 / (radius * 2.0f) + 0.5f, -z0 / (radius * 2.0f) + 0.5f, 0.0f, 1.0f, 0.0f);
+        VertexData top1 = MakeVertex(x1, halfHeight, z1, x1 / (radius * 2.0f) + 0.5f, -z1 / (radius * 2.0f) + 0.5f, 0.0f, 1.0f, 0.0f);
+        PushTriangle(data, topCenter, top1, top0);
+
+        VertexData bottomCenter = MakeVertex(0.0f, -halfHeight, 0.0f, 0.5f, 0.5f, 0.0f, -1.0f, 0.0f);
+        VertexData bottom0 = MakeVertex(x0, -halfHeight, z0, x0 / (radius * 2.0f) + 0.5f, z0 / (radius * 2.0f) + 0.5f, 0.0f, -1.0f, 0.0f);
+        VertexData bottom1 = MakeVertex(x1, -halfHeight, z1, x1 / (radius * 2.0f) + 0.5f, z1 / (radius * 2.0f) + 0.5f, 0.0f, -1.0f, 0.0f);
+        PushTriangle(data, bottomCenter, bottom0, bottom1);
+    }
+
+    return data;
+}
+
+Model::ModelData Model::CreateConeData(uint32_t subdivision, float radius, float height) {
+    ModelData data;
+    subdivision = (subdivision < 3) ? 3 : subdivision;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    float halfHeight = height * 0.5f;
+    float slope = radius / height;
+
+    for (uint32_t i = 0; i < subdivision; ++i) {
+        float angle0 = 2.0f * kPi * static_cast<float>(i) / static_cast<float>(subdivision);
+        float angle1 = 2.0f * kPi * static_cast<float>(i + 1) / static_cast<float>(subdivision);
+        float midAngle = (angle0 + angle1) * 0.5f;
+
+        float x0 = std::cos(angle0) * radius;
+        float z0 = std::sin(angle0) * radius;
+        float x1 = std::cos(angle1) * radius;
+        float z1 = std::sin(angle1) * radius;
+        float u0 = static_cast<float>(i) / static_cast<float>(subdivision);
+        float u1 = static_cast<float>(i + 1) / static_cast<float>(subdivision);
+
+        Vector3 normal0 = Normalize({ std::cos(angle0), slope, std::sin(angle0) }, { 1.0f, 0.0f, 0.0f });
+        Vector3 normal1 = Normalize({ std::cos(angle1), slope, std::sin(angle1) }, { 1.0f, 0.0f, 0.0f });
+        Vector3 normalApex = Normalize({ std::cos(midAngle), slope, std::sin(midAngle) }, { 0.0f, 1.0f, 0.0f });
+
+        PushTriangle(data,
+            MakeVertex(0.0f, halfHeight, 0.0f, 0.5f, 0.0f, normalApex.x, normalApex.y, normalApex.z),
+            MakeVertex(x1, -halfHeight, z1, u1, 1.0f, normal1.x, normal1.y, normal1.z),
+            MakeVertex(x0, -halfHeight, z0, u0, 1.0f, normal0.x, normal0.y, normal0.z));
+
+        VertexData bottomCenter = MakeVertex(0.0f, -halfHeight, 0.0f, 0.5f, 0.5f, 0.0f, -1.0f, 0.0f);
+        VertexData bottom0 = MakeVertex(x0, -halfHeight, z0, x0 / (radius * 2.0f) + 0.5f, z0 / (radius * 2.0f) + 0.5f, 0.0f, -1.0f, 0.0f);
+        VertexData bottom1 = MakeVertex(x1, -halfHeight, z1, x1 / (radius * 2.0f) + 0.5f, z1 / (radius * 2.0f) + 0.5f, 0.0f, -1.0f, 0.0f);
+        PushTriangle(data, bottomCenter, bottom0, bottom1);
+    }
+
+    return data;
+}
+
+Model::ModelData Model::CreateTriangleData() {
+    ModelData data;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    const Vector3 normal = { 0.0f, 1.0f, 0.0f };
+    PushTriangle(data,
+        MakeVertex(-1.0f, 0.0f, -1.0f, 0.0f, 1.0f, normal.x, normal.y, normal.z),
+        MakeVertex(0.0f, 0.0f, 1.0f, 0.5f, 0.0f, normal.x, normal.y, normal.z),
+        MakeVertex(1.0f, 0.0f, -1.0f, 1.0f, 1.0f, normal.x, normal.y, normal.z));
+
+    return data;
+}
+
+Model::ModelData Model::CreateBoxData() {
+    ModelData data;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    const float min = -1.0f;
+    const float max = 1.0f;
+
+    PushQuad(data,
+        MakeVertex(min, max, max, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+        MakeVertex(max, max, max, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+        MakeVertex(min, min, max, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f),
+        MakeVertex(max, min, max, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+
+    PushQuad(data,
+        MakeVertex(max, max, min, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f),
+        MakeVertex(min, max, min, 1.0f, 0.0f, 0.0f, 0.0f, -1.0f),
+        MakeVertex(max, min, min, 0.0f, 1.0f, 0.0f, 0.0f, -1.0f),
+        MakeVertex(min, min, min, 1.0f, 1.0f, 0.0f, 0.0f, -1.0f));
+
+    PushQuad(data,
+        MakeVertex(min, max, min, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+        MakeVertex(min, max, max, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+        MakeVertex(min, min, min, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f),
+        MakeVertex(min, min, max, 1.0f, 1.0f, -1.0f, 0.0f, 0.0f));
+
+    PushQuad(data,
+        MakeVertex(max, max, max, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f),
+        MakeVertex(max, max, min, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f),
+        MakeVertex(max, min, max, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f),
+        MakeVertex(max, min, min, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f));
+
+    PushQuad(data,
+        MakeVertex(min, max, min, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f),
+        MakeVertex(max, max, min, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f),
+        MakeVertex(min, max, max, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f),
+        MakeVertex(max, max, max, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f));
+
+    PushQuad(data,
+        MakeVertex(min, min, max, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f),
+        MakeVertex(max, min, max, 1.0f, 0.0f, 0.0f, -1.0f, 0.0f),
+        MakeVertex(min, min, min, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f),
+        MakeVertex(max, min, min, 1.0f, 1.0f, 0.0f, -1.0f, 0.0f));
+
     return data;
 }
 
