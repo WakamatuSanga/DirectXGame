@@ -33,6 +33,18 @@ public:
         float invertIntensity = 1.0f;
         uint32_t vignetteEnabled = 0;
         float vignetteIntensity = 1.0f;
+        uint32_t outlineMode = 0;
+        float outlineIntensity = 1.0f;
+        float outlineThickness = 1.0f;
+        float outlineThreshold = 0.1f;
+        float outlineSoftness = 0.05f;
+        float outlineDepthThreshold = 0.002f;
+        float outlineDepthStrength = 10.0f;
+        uint32_t hybridColorSource = 2;
+        float hybridColorWeight = 1.0f;
+        float hybridDepthWeight = 1.0f;
+        std::array<float, 2> outlinePadding = { 0.0f, 0.0f };
+        std::array<float, 4> outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     };
 
     DirectXCommon() = default;
@@ -77,6 +89,9 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTextureSRVCPUHandle() const { return renderTextureSRVHandleCPU_; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetRenderTextureSRVGPUHandle() const { return renderTextureSRVHandleGPU_; }
     uint32_t GetRenderTextureSRVIndex() const { return renderTextureSRVIndex_; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDepthTextureSRVCPUHandle() const { return depthTextureSRVHandleCPU_; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetDepthTextureSRVGPUHandle() const { return depthTextureSRVHandleGPU_; }
+    uint32_t GetDepthTextureSRVIndex() const { return depthTextureSRVIndex_; }
     const std::array<float, 4>& GetRenderTextureClearColor() const { return renderTextureClearColor_; }
     PostEffectParameters& GetPostEffectParameters() { return postEffectParameters_; }
     const PostEffectParameters& GetPostEffectParameters() const { return postEffectParameters_; }
@@ -179,6 +194,9 @@ private:
 
     // 深度バッファ
     Microsoft::WRL::ComPtr<ID3D12Resource> depthBuffer;
+    D3D12_CPU_DESCRIPTOR_HANDLE depthTextureSRVHandleCPU_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE depthTextureSRVHandleGPU_{};
+    uint32_t depthTextureSRVIndex_ = 0;
 
     // デスクリプタヒープ
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;

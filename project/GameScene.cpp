@@ -6,11 +6,34 @@
 #include "ModelManager.h"
 #include "ParticleManager.h"
 #include "Audio.h"
+#include <array>
 #include <cmath>
 
 #ifdef _DEBUG
 #include "externals/imgui/imgui.h"
 #endif
+
+namespace {
+    struct OutlinePreset {
+        const char* name;
+        uint32_t outlineMode;
+        uint32_t hybridColorSource;
+        float hybridColorWeight;
+        float hybridDepthWeight;
+        float outlineStrength;
+        float outlineThreshold;
+        float outlineSoftness;
+        float outlineThickness;
+        std::array<float, 4> outlineColor;
+    };
+
+    constexpr OutlinePreset kOutlinePresets[] = {
+        { "Balanced", 4u, 2u, 1.00f, 1.00f, 2.40f, 0.050f, 0.025f, 1.10f, { 0.02f, 0.02f, 0.02f, 1.0f } },
+        { "Color Emphasis", 4u, 2u, 1.35f, 0.45f, 2.80f, 0.055f, 0.025f, 1.15f, { 0.03f, 0.03f, 0.03f, 1.0f } },
+        { "Depth Emphasis", 4u, 1u, 0.55f, 1.45f, 2.60f, 0.060f, 0.030f, 1.20f, { 0.01f, 0.01f, 0.01f, 1.0f } },
+        { "Soft Outline", 4u, 1u, 0.85f, 0.75f, 1.70f, 0.035f, 0.100f, 1.60f, { 0.08f, 0.08f, 0.08f, 1.0f } },
+    };
+}
 
 void GameScene::Initialize() {
     auto modelManager = ModelManager::GetInstance();
@@ -248,11 +271,56 @@ void GameScene::Update() {
         std::string sliderLabel = std::string(label) + " Strength";
         ImGui::SliderFloat(sliderLabel.c_str(), &intensity, 0.0f, 1.0f, "%.2f");
         };
+    auto ApplyOutlinePreset = [&](const OutlinePreset& preset) {
+        postEffectParams.outlineMode = preset.outlineMode;
+        postEffectParams.hybridColorSource = preset.hybridColorSource;
+        postEffectParams.hybridColorWeight = preset.hybridColorWeight;
+        postEffectParams.hybridDepthWeight = preset.hybridDepthWeight;
+        postEffectParams.outlineIntensity = preset.outlineStrength;
+        postEffectParams.outlineThreshold = preset.outlineThreshold;
+        postEffectParams.outlineSoftness = preset.outlineSoftness;
+        postEffectParams.outlineThickness = preset.outlineThickness;
+        postEffectParams.outlineColor = preset.outlineColor;
+    };
     bool gaussianEnabled = postEffectParams.gaussianEnabled != 0;
     if (ImGui::Checkbox("Gaussian", &gaussianEnabled)) {
         postEffectParams.gaussianEnabled = gaussianEnabled ? 1u : 0u;
     }
     ImGui::SliderFloat("Gaussian Strength", &postEffectParams.gaussianIntensity, 0.0f, 4.0f, "%.2f");
+    bool outlineEnabled = postEffectParams.outlineMode != 0;
+    if (ImGui::Checkbox("Outline", &outlineEnabled)) {
+        if (!outlineEnabled) {
+            postEffectParams.outlineMode = 0;
+        } else if (postEffectParams.outlineMode == 0) {
+            postEffectParams.outlineMode = 1;
+        }
+    }
+    const char* outlineModeNames[] = { "Off", "ColorDiff8", "Sobel", "Depth", "Hybrid" };
+    int outlineMode = static_cast<int>(postEffectParams.outlineMode);
+    if (ImGui::Combo("Outline Mode", &outlineMode, outlineModeNames, IM_ARRAYSIZE(outlineModeNames))) {
+        postEffectParams.outlineMode = static_cast<uint32_t>(outlineMode);
+    }
+    static int outlinePresetIndex = 0;
+    const char* outlinePresetNames[] = { "Balanced", "Color Emphasis", "Depth Emphasis", "Soft Outline" };
+    if (ImGui::Combo("Outline Preset", &outlinePresetIndex, outlinePresetNames, IM_ARRAYSIZE(outlinePresetNames))) {
+        ApplyOutlinePreset(kOutlinePresets[outlinePresetIndex]);
+    }
+    ImGui::SliderFloat("Outline Strength", &postEffectParams.outlineIntensity, 0.0f, 10.0f, "%.2f");
+    ImGui::SliderFloat("Outline Thickness", &postEffectParams.outlineThickness, 0.5f, 4.0f, "%.2f");
+    ImGui::SliderFloat("Outline Threshold", &postEffectParams.outlineThreshold, 0.0f, 1.5f, "%.3f");
+    ImGui::SliderFloat("Outline Softness", &postEffectParams.outlineSoftness, 0.001f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Outline Depth Threshold", &postEffectParams.outlineDepthThreshold, 0.0001f, 0.05f, "%.4f");
+    ImGui::SliderFloat("Outline Depth Strength", &postEffectParams.outlineDepthStrength, 0.0f, 50.0f, "%.2f");
+    if (postEffectParams.outlineMode == 4) {
+        const char* hybridColorSourceNames[] = { "ColorDiff8", "Sobel" };
+        int hybridColorSourceIndex = (postEffectParams.hybridColorSource == 1u) ? 0 : 1;
+        if (ImGui::Combo("Hybrid Color Source", &hybridColorSourceIndex, hybridColorSourceNames, IM_ARRAYSIZE(hybridColorSourceNames))) {
+            postEffectParams.hybridColorSource = (hybridColorSourceIndex == 0) ? 1u : 2u;
+        }
+        ImGui::SliderFloat("Hybrid Color Weight", &postEffectParams.hybridColorWeight, 0.0f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Hybrid Depth Weight", &postEffectParams.hybridDepthWeight, 0.0f, 2.0f, "%.2f");
+    }
+    ImGui::ColorEdit4("Outline Color", postEffectParams.outlineColor.data());
     DrawPostEffectUI("Grayscale", postEffectParams.grayscaleEnabled, postEffectParams.grayscaleIntensity);
     DrawPostEffectUI("Sepia", postEffectParams.sepiaEnabled, postEffectParams.sepiaIntensity);
     DrawPostEffectUI("Invert", postEffectParams.invertEnabled, postEffectParams.invertIntensity);
