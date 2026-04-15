@@ -20,6 +20,7 @@ void MyGame::Initialize() {
 
     srvManager_ = SrvManager::GetInstance();
     srvManager_->Initialize(dxCommon_.get());
+    dxCommon_->CreateRenderTexture(srvManager_);
 
     imguiManager_ = std::make_unique<ImGuiManager>();
     imguiManager_->Initialize(winApp_.get(), dxCommon_.get());
@@ -91,6 +92,8 @@ void MyGame::Draw() {
     dxCommon_->PreDraw();
     srvManager_->PreDraw();
     SceneManager::GetInstance()->Draw();
+    dxCommon_->PrepareSwapChainForImGui();
+    dxCommon_->CopyRenderTextureToSwapChain();
     imguiManager_->Draw();
     dxCommon_->PostDraw();
 }

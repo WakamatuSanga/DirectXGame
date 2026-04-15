@@ -5,6 +5,7 @@
 #include <string>
 
 #include "Logger.h"
+#include "SrvManager.h"
 #include "StringUtility.h"
 
 // DirectXTex / d3dx12
@@ -50,6 +51,96 @@ static ID3D12Resource* CreateDepthStencilTextureResource(
         IID_PPV_ARGS(&resource));
     assert(SUCCEEDED(hr));
     return resource;
+}
+
+static ID3D12Resource* CreateRenderTextureResource(
+    ID3D12Device* device,
+    int32_t width,
+    int32_t height,
+    DXGI_FORMAT format,
+    const float clearColor[4])
+{
+    D3D12_RESOURCE_DESC resourceDesc{};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Width = width;
+    resourceDesc.Height = height;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = format;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    D3D12_HEAP_PROPERTIES heapProperties{};
+    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12_CLEAR_VALUE clearValue{};
+    clearValue.Format = format;
+    clearValue.Color[0] = clearColor[0];
+    clearValue.Color[1] = clearColor[1];
+    clearValue.Color[2] = clearColor[2];
+    clearValue.Color[3] = clearColor[3];
+
+    ID3D12Resource* resource = nullptr;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &resourceDesc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &clearValue,
+        IID_PPV_ARGS(&resource));
+    assert(SUCCEEDED(hr));
+    return resource;
+}
+
+void DirectXCommon::PrepareSwapChainForImGui()
+{
+    UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    commandList->ResourceBarrier(1, &barrier);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHandles[backBufferIndex];
+    commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+    const float clearColor[4] = { 0.1f, 0.25f, 0.5f, 1.0f };
+    commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    commandList->RSSetViewports(1, &viewport);
+    commandList->RSSetScissorRects(1, &scissorRect);
+}
+
+void DirectXCommon::CopyRenderTextureToSwapChain()
+{
+    assert(renderTextureResource_);
+    assert(copyRootSignature_);
+    assert(copyPipelineState_);
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = renderTextureResource_.Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    commandList->ResourceBarrier(1, &barrier);
+
+    ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+    commandList->SetDescriptorHeaps(1, descriptorHeaps);
+
+    commandList->SetGraphicsRootSignature(copyRootSignature_.Get());
+    commandList->SetPipelineState(copyPipelineState_.Get());
+    commandList->SetGraphicsRootDescriptorTable(0, renderTextureSRVHandleGPU_);
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->DrawInstanced(3, 1, 0, 0);
+
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    commandList->ResourceBarrier(1, &barrier);
 }
 
 // --------------------
@@ -110,27 +201,26 @@ void DirectXCommon::Finalize()
 // --------------------
 void DirectXCommon::PreDraw()
 {
-    UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+    D3D12_CPU_DESCRIPTOR_HANDLE sceneRTVHandle = renderTextureRTVHandle_;
 
     // PRESENT → RENDER_TARGET
-    D3D12_RESOURCE_BARRIER barrier{};
+    /*
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
+    barrier.Transition.pResource = swapChainResources[0].Get();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    commandList->ResourceBarrier(1, &barrier);
+    */
 
     // RTV / DSV 設定
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHandles[backBufferIndex];
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = sceneRTVHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle =
         dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
     commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     // 画面クリア
-    const float clearColor[4] = { 0.1f, 0.25f, 0.5f, 1.0f };
-    commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    commandList->ClearRenderTargetView(rtvHandle, renderTextureClearColor_.data(), 0, nullptr);
 
     // 深度クリア
     commandList->ClearDepthStencilView(
@@ -191,6 +281,137 @@ void DirectXCommon::PostDraw()
     assert(SUCCEEDED(hr));
     hr = commandList->Reset(commandAllocator.Get(), nullptr);
     assert(SUCCEEDED(hr));
+}
+
+void DirectXCommon::CreateCopyRootSignature()
+{
+    HRESULT hr = S_OK;
+
+    D3D12_DESCRIPTOR_RANGE descriptorRange{};
+    descriptorRange.BaseShaderRegister = 0;
+    descriptorRange.NumDescriptors = 1;
+    descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    D3D12_ROOT_PARAMETER rootParameter{};
+    rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameter.DescriptorTable.pDescriptorRanges = &descriptorRange;
+    rootParameter.DescriptorTable.NumDescriptorRanges = 1;
+
+    D3D12_STATIC_SAMPLER_DESC staticSampler{};
+    staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    staticSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    staticSampler.MaxLOD = D3D12_FLOAT32_MAX;
+    staticSampler.ShaderRegister = 0;
+    staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
+    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    rootSignatureDesc.pParameters = &rootParameter;
+    rootSignatureDesc.NumParameters = 1;
+    rootSignatureDesc.pStaticSamplers = &staticSampler;
+    rootSignatureDesc.NumStaticSamplers = 1;
+
+    ComPtr<ID3DBlob> signatureBlob;
+    ComPtr<ID3DBlob> errorBlob;
+    hr = D3D12SerializeRootSignature(
+        &rootSignatureDesc,
+        D3D_ROOT_SIGNATURE_VERSION_1,
+        &signatureBlob,
+        &errorBlob);
+    if (FAILED(hr)) {
+        if (errorBlob) {
+            Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+        }
+        assert(false);
+    }
+
+    hr = device->CreateRootSignature(
+        0,
+        signatureBlob->GetBufferPointer(),
+        signatureBlob->GetBufferSize(),
+        IID_PPV_ARGS(&copyRootSignature_));
+    assert(SUCCEEDED(hr));
+}
+
+void DirectXCommon::CreateCopyPipelineState()
+{
+    if (copyPipelineState_) {
+        return;
+    }
+
+    CreateCopyRootSignature();
+
+    ComPtr<IDxcBlob> vs = CompileShader(L"resources/shaders/CopyImage.VS.hlsl", L"vs_6_0");
+    ComPtr<IDxcBlob> ps = CompileShader(L"resources/shaders/CopyImage.PS.hlsl", L"ps_6_0");
+
+    D3D12_BLEND_DESC blendDesc{};
+    blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    D3D12_RASTERIZER_DESC rasterizerDesc{};
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+    rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+
+    D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+    depthStencilDesc.DepthEnable = FALSE;
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc{};
+    pipelineStateDesc.pRootSignature = copyRootSignature_.Get();
+    pipelineStateDesc.InputLayout = { nullptr, 0 };
+    pipelineStateDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+    pipelineStateDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+    pipelineStateDesc.BlendState = blendDesc;
+    pipelineStateDesc.RasterizerState = rasterizerDesc;
+    pipelineStateDesc.DepthStencilState = depthStencilDesc;
+    pipelineStateDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+    pipelineStateDesc.NumRenderTargets = 1;
+    pipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pipelineStateDesc.SampleDesc.Count = 1;
+    pipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+    HRESULT hr = device->CreateGraphicsPipelineState(
+        &pipelineStateDesc,
+        IID_PPV_ARGS(&copyPipelineState_));
+    assert(SUCCEEDED(hr));
+}
+
+void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
+{
+    assert(device);
+    assert(rtvDescriptorHeap);
+    assert(srvManager);
+    assert(srvManager->CanAllocate());
+
+    CreateCopyPipelineState();
+
+    renderTextureResource_.Reset();
+    renderTextureResource_.Attach(CreateRenderTextureResource(
+        device.Get(),
+        WinApp::kClientWidth,
+        WinApp::kClientHeight,
+        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+        renderTextureClearColor_.data()));
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    renderTextureRTVHandle_ = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    renderTextureRTVHandle_.ptr += static_cast<SIZE_T>(descriptorSizeRTV) * 2;
+    device->CreateRenderTargetView(renderTextureResource_.Get(), &rtvDesc, renderTextureRTVHandle_);
+
+    renderTextureSRVIndex_ = srvManager->Allocate();
+    renderTextureSRVHandleCPU_ = srvManager->GetCPUDescriptorHandle(renderTextureSRVIndex_);
+    renderTextureSRVHandleGPU_ = srvManager->GetGPUDescriptorHandle(renderTextureSRVIndex_);
+    srvManager->CreateSRVforTexture2D(
+        renderTextureSRVIndex_,
+        renderTextureResource_.Get(),
+        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+        1);
 }
 
 // FPS固定 初期化
@@ -379,7 +600,7 @@ void DirectXCommon::CreateDescriptorHeaps()
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc{};
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        desc.NumDescriptors = 2;
+        desc.NumDescriptors = 3;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         hr = device->CreateDescriptorHeap(&desc,
             IID_PPV_ARGS(&rtvDescriptorHeap));
