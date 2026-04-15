@@ -48,6 +48,14 @@ public:
 
     // 三角形ポリゴンで球のモデルデータを生成する関数
     static ModelData CreateSphereData(uint32_t subdivision = 16);
+    static ModelData CreatePlaneData();
+    static ModelData CreateCircleData(uint32_t subdivision = 32);
+    static ModelData CreateRingData(uint32_t subdivision = 32, float innerRadius = 0.5f, float outerRadius = 1.0f);
+    static ModelData CreateTorusData(uint32_t majorSubdivision = 32, uint32_t minorSubdivision = 16, float majorRadius = 0.7f, float minorRadius = 0.3f);
+    static ModelData CreateCylinderData(uint32_t subdivision = 32, float radius = 1.0f, float height = 2.0f);
+    static ModelData CreateConeData(uint32_t subdivision = 32, float radius = 1.0f, float height = 2.0f);
+    static ModelData CreateTriangleData();
+    static ModelData CreateBoxData();
 
 private:
     ModelCommon* modelCommon_ = nullptr;
