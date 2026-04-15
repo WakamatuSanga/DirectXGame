@@ -261,6 +261,12 @@
     </Text>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="resources\shaders\GaussianBlurX.PS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="resources\shaders\GaussianBlurY.PS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
     <FxCompile Include="resources\shaders\CopyImage.PS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
