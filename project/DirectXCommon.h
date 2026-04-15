@@ -20,6 +20,17 @@ class SrvManager;
 // DirectX 基盤クラス
 class DirectXCommon {
 public:
+    struct PostEffectParameters {
+        uint32_t grayscaleEnabled = 0;
+        float grayscaleIntensity = 1.0f;
+        uint32_t sepiaEnabled = 0;
+        float sepiaIntensity = 1.0f;
+        uint32_t invertEnabled = 0;
+        float invertIntensity = 1.0f;
+        uint32_t vignetteEnabled = 0;
+        float vignetteIntensity = 1.0f;
+    };
+
     DirectXCommon() = default;
     ~DirectXCommon() = default;
 
@@ -63,6 +74,8 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetRenderTextureSRVGPUHandle() const { return renderTextureSRVHandleGPU_; }
     uint32_t GetRenderTextureSRVIndex() const { return renderTextureSRVIndex_; }
     const std::array<float, 4>& GetRenderTextureClearColor() const { return renderTextureClearColor_; }
+    PostEffectParameters& GetPostEffectParameters() { return postEffectParameters_; }
+    const PostEffectParameters& GetPostEffectParameters() const { return postEffectParameters_; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
     D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
 
@@ -197,4 +210,7 @@ private:
     std::array<float, 4> renderTextureClearColor_ = { 0.05f, 0.05f, 0.1f, 1.0f };
     Microsoft::WRL::ComPtr<ID3D12RootSignature> copyRootSignature_;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> copyPipelineState_;
+    Microsoft::WRL::ComPtr<ID3D12Resource> postEffectResource_;
+    PostEffectParameters* postEffectData_ = nullptr;
+    PostEffectParameters postEffectParameters_{};
 };

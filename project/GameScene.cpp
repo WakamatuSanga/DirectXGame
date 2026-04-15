@@ -110,6 +110,7 @@ void GameScene::Finalize() {}
 void GameScene::Update() {
     auto input = MyGame::GetInstance()->GetInput();
     auto particleManager = ParticleManager::GetInstance();
+    auto& postEffectParams = MyGame::GetInstance()->GetDxCommon()->GetPostEffectParameters();
     auto& hitEffectParams = particleManager->GetHitEffectParams();
     auto& fireballEffectParams = particleManager->GetFireballEffectParams();
     auto& windEffectParams = particleManager->GetWindEffectParams();
@@ -237,6 +238,20 @@ void GameScene::Update() {
     ImGui::SliderFloat("Reflect Strength", &sphereEnvironmentMapIntensity_, 0.0f, 1.0f, "%.2f");
     ImGui::TextWrapped("Cubemap DDS: %s", skyboxTexturePath_.c_str());
     ImGui::Text("Cubemap TextureIndex: %u", skyboxTextureIndex_);
+
+    ImGui::SeparatorText("Post Effects");
+    auto DrawPostEffectUI = [](const char* label, uint32_t& enabled, float& intensity) {
+        bool isEnabled = enabled != 0;
+        if (ImGui::Checkbox(label, &isEnabled)) {
+            enabled = isEnabled ? 1u : 0u;
+        }
+        std::string sliderLabel = std::string(label) + " Strength";
+        ImGui::SliderFloat(sliderLabel.c_str(), &intensity, 0.0f, 1.0f, "%.2f");
+        };
+    DrawPostEffectUI("Grayscale", postEffectParams.grayscaleEnabled, postEffectParams.grayscaleIntensity);
+    DrawPostEffectUI("Sepia", postEffectParams.sepiaEnabled, postEffectParams.sepiaIntensity);
+    DrawPostEffectUI("Invert", postEffectParams.invertEnabled, postEffectParams.invertIntensity);
+    DrawPostEffectUI("Vignette", postEffectParams.vignetteEnabled, postEffectParams.vignetteIntensity);
 
     ImGui::SeparatorText("Primitive Preview");
     ImGui::Checkbox("Show Primitive Preview", &isPrimitivePreviewVisible_);
