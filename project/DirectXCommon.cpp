@@ -32,7 +32,7 @@ static ID3D12Resource* CreateDepthStencilTextureResource(
     resourceDesc.Height = height;
     resourceDesc.MipLevels = 1;
     resourceDesc.DepthOrArraySize = 1;
-    resourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    resourceDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
     resourceDesc.SampleDesc.Count = 1;
     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -117,6 +117,7 @@ void DirectXCommon::PrepareSwapChainForImGui()
 void DirectXCommon::CopyRenderTextureToSwapChain()
 {
     assert(renderTextureResource_);
+    assert(depthBuffer);
     assert(copyRootSignature_);
     assert(copyPipelineState_);
     assert(postEffectResource_);
@@ -144,7 +145,8 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
         commandList->SetGraphicsRootSignature(copyRootSignature_.Get());
         commandList->SetPipelineState(pipelineState);
         commandList->SetGraphicsRootDescriptorTable(0, sourceSRV);
-        commandList->SetGraphicsRootConstantBufferView(1, postEffectResource_->GetGPUVirtualAddress());
+        commandList->SetGraphicsRootDescriptorTable(1, depthTextureSRVHandleGPU_);
+        commandList->SetGraphicsRootConstantBufferView(2, postEffectResource_->GetGPUVirtualAddress());
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
         };
@@ -158,16 +160,20 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
         assert(gaussianBlurYPipelineState_);
 
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         DrawFullscreenPass(gaussianBlurXPipelineState_.Get(), renderTextureSRVHandleGPU_, gaussianIntermediateRTVHandle_);
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
         TransitionResource(gaussianIntermediateResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         DrawFullscreenPass(gaussianBlurYPipelineState_.Get(), gaussianIntermediateSRVHandleGPU_, backBufferRTV);
         TransitionResource(gaussianIntermediateResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     } else {
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         DrawFullscreenPass(copyPipelineState_.Get(), renderTextureSRVHandleGPU_, backBufferRTV);
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     }
 }
 
@@ -315,21 +321,32 @@ void DirectXCommon::CreateCopyRootSignature()
 {
     HRESULT hr = S_OK;
 
-    D3D12_DESCRIPTOR_RANGE descriptorRange{};
-    descriptorRange.BaseShaderRegister = 0;
-    descriptorRange.NumDescriptors = 1;
-    descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    D3D12_DESCRIPTOR_RANGE descriptorRanges[2]{};
+    descriptorRanges[0].BaseShaderRegister = 0;
+    descriptorRanges[0].NumDescriptors = 1;
+    descriptorRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootParameters[2]{};
+    descriptorRanges[1].BaseShaderRegister = 1;
+    descriptorRanges[1].NumDescriptors = 1;
+    descriptorRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    D3D12_ROOT_PARAMETER rootParameters[3]{};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRange;
+    rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRanges[0];
     rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
 
-    rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameters[1].Descriptor.ShaderRegister = 0;
+    rootParameters[1].DescriptorTable.pDescriptorRanges = &descriptorRanges[1];
+    rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+
+    rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[2].Descriptor.ShaderRegister = 0;
+    rootParameters[2].Descriptor.RegisterSpace = 0;
 
     D3D12_STATIC_SAMPLER_DESC staticSampler{};
     staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -423,6 +440,7 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
     assert(device);
     assert(rtvDescriptorHeap);
     assert(srvManager);
+    assert(depthBuffer);
 
     CreateCopyPipelineState();
 
@@ -474,6 +492,16 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
         gaussianIntermediateSRVHandleGPU_,
         gaussianIntermediateSRVIndex_,
         3);
+
+    assert(srvManager->CanAllocate());
+    depthTextureSRVIndex_ = srvManager->Allocate();
+    depthTextureSRVHandleCPU_ = srvManager->GetCPUDescriptorHandle(depthTextureSRVIndex_);
+    depthTextureSRVHandleGPU_ = srvManager->GetGPUDescriptorHandle(depthTextureSRVIndex_);
+    srvManager->CreateSRVforTexture2D(
+        depthTextureSRVIndex_,
+        depthBuffer.Get(),
+        DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
+        1);
 
     const size_t postEffectBufferSize = (sizeof(PostEffectParameters) + 0xff) & ~static_cast<size_t>(0xff);
     postEffectResource_ = CreateBufferResource(postEffectBufferSize);

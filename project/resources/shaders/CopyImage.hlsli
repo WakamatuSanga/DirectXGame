@@ -18,4 +18,16 @@ struct PostEffectParameters
     float invertIntensity;
     uint vignetteEnabled;
     float vignetteIntensity;
+    uint outlineMode;
+    float outlineIntensity;
+    float outlineThickness;
+    float outlineThreshold;
+    float outlineSoftness;
+    float outlineDepthThreshold;
+    float outlineDepthStrength;
+    uint hybridColorSource;
+    float hybridColorWeight;
+    float hybridDepthWeight;
+    float2 outlinePadding;
+    float4 outlineColor;
 };
