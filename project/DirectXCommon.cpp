@@ -119,6 +119,8 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
     assert(renderTextureResource_);
     assert(copyRootSignature_);
     assert(copyPipelineState_);
+    assert(postEffectResource_);
+    assert(postEffectData_);
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -132,9 +134,12 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
     ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
     commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
+    *postEffectData_ = postEffectParameters_;
+
     commandList->SetGraphicsRootSignature(copyRootSignature_.Get());
     commandList->SetPipelineState(copyPipelineState_.Get());
     commandList->SetGraphicsRootDescriptorTable(0, renderTextureSRVHandleGPU_);
+    commandList->SetGraphicsRootConstantBufferView(1, postEffectResource_->GetGPUVirtualAddress());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -293,11 +298,15 @@ void DirectXCommon::CreateCopyRootSignature()
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootParameter{};
-    rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameter.DescriptorTable.pDescriptorRanges = &descriptorRange;
-    rootParameter.DescriptorTable.NumDescriptorRanges = 1;
+    D3D12_ROOT_PARAMETER rootParameters[2]{};
+    rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRange;
+    rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+
+    rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[1].Descriptor.ShaderRegister = 0;
 
     D3D12_STATIC_SAMPLER_DESC staticSampler{};
     staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -311,8 +320,8 @@ void DirectXCommon::CreateCopyRootSignature()
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-    rootSignatureDesc.pParameters = &rootParameter;
-    rootSignatureDesc.NumParameters = 1;
+    rootSignatureDesc.pParameters = rootParameters;
+    rootSignatureDesc.NumParameters = _countof(rootParameters);
     rootSignatureDesc.pStaticSamplers = &staticSampler;
     rootSignatureDesc.NumStaticSamplers = 1;
 
@@ -412,6 +421,12 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
         renderTextureResource_.Get(),
         DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
         1);
+
+    const size_t postEffectBufferSize = (sizeof(PostEffectParameters) + 0xff) & ~static_cast<size_t>(0xff);
+    postEffectResource_ = CreateBufferResource(postEffectBufferSize);
+    HRESULT hr = postEffectResource_->Map(0, nullptr, reinterpret_cast<void**>(&postEffectData_));
+    assert(SUCCEEDED(hr));
+    *postEffectData_ = postEffectParameters_;
 }
 
 // FPS固定 初期化
