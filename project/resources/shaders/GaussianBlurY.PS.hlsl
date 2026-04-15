@@ -4,6 +4,23 @@ Texture2D<float4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 ConstantBuffer<PostEffectParameters> gPostEffectParameters : register(b0);
 
+float3 ApplyGaussianBlurVertical(float2 texcoord)
+{
+    uint width, height;
+    gTexture.GetDimensions(width, height);
+
+    float radius = gPostEffectParameters.gaussianIntensity;
+    float2 texelOffset = float2(0.0f, 1.0f / height) * radius;
+
+    float3 color = gTexture.Sample(gSampler, texcoord).rgb * 0.375f;
+    color += gTexture.Sample(gSampler, texcoord + texelOffset).rgb * 0.25f;
+    color += gTexture.Sample(gSampler, texcoord - texelOffset).rgb * 0.25f;
+    color += gTexture.Sample(gSampler, texcoord + texelOffset * 2.0f).rgb * 0.0625f;
+    color += gTexture.Sample(gSampler, texcoord - texelOffset * 2.0f).rgb * 0.0625f;
+
+    return color;
+}
+
 float3 ApplySmoothing(float2 texcoord, float3 baseColor, float intensity)
 {
     uint width, height;
@@ -56,7 +73,7 @@ float ApplyVignette(float2 texcoord, float intensity)
 float4 main(VertexShaderOutput input) : SV_TARGET
 {
     float4 sampledColor = gTexture.Sample(gSampler, input.texcoord);
-    float3 color = sampledColor.rgb;
+    float3 color = ApplyGaussianBlurVertical(input.texcoord);
 
     float smoothingIntensity = gPostEffectParameters.smoothingIntensity * gPostEffectParameters.smoothingEnabled;
     float grayscaleIntensity = gPostEffectParameters.grayscaleIntensity * gPostEffectParameters.grayscaleEnabled;

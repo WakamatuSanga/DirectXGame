@@ -6,6 +6,10 @@ struct VertexShaderOutput
 
 struct PostEffectParameters
 {
+    uint gaussianEnabled;
+    float gaussianIntensity;
+    uint smoothingEnabled;
+    float smoothingIntensity;
     uint grayscaleEnabled;
     float grayscaleIntensity;
     uint sepiaEnabled;

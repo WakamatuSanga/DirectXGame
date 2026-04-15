@@ -248,10 +248,16 @@ void GameScene::Update() {
         std::string sliderLabel = std::string(label) + " Strength";
         ImGui::SliderFloat(sliderLabel.c_str(), &intensity, 0.0f, 1.0f, "%.2f");
         };
+    bool gaussianEnabled = postEffectParams.gaussianEnabled != 0;
+    if (ImGui::Checkbox("Gaussian", &gaussianEnabled)) {
+        postEffectParams.gaussianEnabled = gaussianEnabled ? 1u : 0u;
+    }
+    ImGui::SliderFloat("Gaussian Strength", &postEffectParams.gaussianIntensity, 0.0f, 4.0f, "%.2f");
     DrawPostEffectUI("Grayscale", postEffectParams.grayscaleEnabled, postEffectParams.grayscaleIntensity);
     DrawPostEffectUI("Sepia", postEffectParams.sepiaEnabled, postEffectParams.sepiaIntensity);
     DrawPostEffectUI("Invert", postEffectParams.invertEnabled, postEffectParams.invertIntensity);
     DrawPostEffectUI("Vignette", postEffectParams.vignetteEnabled, postEffectParams.vignetteIntensity);
+    DrawPostEffectUI("Smoothing", postEffectParams.smoothingEnabled, postEffectParams.smoothingIntensity);
 
     ImGui::SeparatorText("Primitive Preview");
     ImGui::Checkbox("Show Primitive Preview", &isPrimitivePreviewVisible_);

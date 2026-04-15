@@ -123,29 +123,52 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
     assert(postEffectData_);
 
     D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = renderTextureResource_.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    commandList->ResourceBarrier(1, &barrier);
-
-    ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
-    commandList->SetDescriptorHeaps(1, descriptorHeaps);
-
     *postEffectData_ = postEffectParameters_;
 
-    commandList->SetGraphicsRootSignature(copyRootSignature_.Get());
-    commandList->SetPipelineState(copyPipelineState_.Get());
-    commandList->SetGraphicsRootDescriptorTable(0, renderTextureSRVHandleGPU_);
-    commandList->SetGraphicsRootConstantBufferView(1, postEffectResource_->GetGPUVirtualAddress());
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->DrawInstanced(3, 1, 0, 0);
+    auto TransitionResource = [&](ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &barrier);
+        };
 
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    commandList->ResourceBarrier(1, &barrier);
+    auto DrawFullscreenPass = [&](ID3D12PipelineState* pipelineState, D3D12_GPU_DESCRIPTOR_HANDLE sourceSRV, D3D12_CPU_DESCRIPTOR_HANDLE targetRTV) {
+        ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+        commandList->SetDescriptorHeaps(1, descriptorHeaps);
+        commandList->OMSetRenderTargets(1, &targetRTV, FALSE, nullptr);
+        commandList->RSSetViewports(1, &viewport);
+        commandList->RSSetScissorRects(1, &scissorRect);
+        commandList->SetGraphicsRootSignature(copyRootSignature_.Get());
+        commandList->SetPipelineState(pipelineState);
+        commandList->SetGraphicsRootDescriptorTable(0, sourceSRV);
+        commandList->SetGraphicsRootConstantBufferView(1, postEffectResource_->GetGPUVirtualAddress());
+        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        commandList->DrawInstanced(3, 1, 0, 0);
+        };
+
+    UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+    D3D12_CPU_DESCRIPTOR_HANDLE backBufferRTV = rtvHandles[backBufferIndex];
+
+    if (postEffectParameters_.gaussianEnabled != 0) {
+        assert(gaussianIntermediateResource_);
+        assert(gaussianBlurXPipelineState_);
+        assert(gaussianBlurYPipelineState_);
+
+        TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        DrawFullscreenPass(gaussianBlurXPipelineState_.Get(), renderTextureSRVHandleGPU_, gaussianIntermediateRTVHandle_);
+        TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        TransitionResource(gaussianIntermediateResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        DrawFullscreenPass(gaussianBlurYPipelineState_.Get(), gaussianIntermediateSRVHandleGPU_, backBufferRTV);
+        TransitionResource(gaussianIntermediateResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    } else {
+        TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        DrawFullscreenPass(copyPipelineState_.Get(), renderTextureSRVHandleGPU_, backBufferRTV);
+        TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    }
 }
 
 // --------------------
@@ -356,7 +379,6 @@ void DirectXCommon::CreateCopyPipelineState()
     CreateCopyRootSignature();
 
     ComPtr<IDxcBlob> vs = CompileShader(L"resources/shaders/CopyImage.VS.hlsl", L"vs_6_0");
-    ComPtr<IDxcBlob> ps = CompileShader(L"resources/shaders/CopyImage.PS.hlsl", L"ps_6_0");
 
     D3D12_BLEND_DESC blendDesc{};
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
@@ -372,7 +394,6 @@ void DirectXCommon::CreateCopyPipelineState()
     pipelineStateDesc.pRootSignature = copyRootSignature_.Get();
     pipelineStateDesc.InputLayout = { nullptr, 0 };
     pipelineStateDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
-    pipelineStateDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
     pipelineStateDesc.BlendState = blendDesc;
     pipelineStateDesc.RasterizerState = rasterizerDesc;
     pipelineStateDesc.DepthStencilState = depthStencilDesc;
@@ -383,10 +404,18 @@ void DirectXCommon::CreateCopyPipelineState()
     pipelineStateDesc.SampleDesc.Count = 1;
     pipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
-    HRESULT hr = device->CreateGraphicsPipelineState(
-        &pipelineStateDesc,
-        IID_PPV_ARGS(&copyPipelineState_));
-    assert(SUCCEEDED(hr));
+    auto CreatePostEffectPipelineState = [&](const std::wstring& pixelShaderPath, Microsoft::WRL::ComPtr<ID3D12PipelineState>& pipelineState) {
+        ComPtr<IDxcBlob> ps = CompileShader(pixelShaderPath, L"ps_6_0");
+        pipelineStateDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+        HRESULT hr = device->CreateGraphicsPipelineState(
+            &pipelineStateDesc,
+            IID_PPV_ARGS(&pipelineState));
+        assert(SUCCEEDED(hr));
+        };
+
+    CreatePostEffectPipelineState(L"resources/shaders/CopyImage.PS.hlsl", copyPipelineState_);
+    CreatePostEffectPipelineState(L"resources/shaders/GaussianBlurX.PS.hlsl", gaussianBlurXPipelineState_);
+    CreatePostEffectPipelineState(L"resources/shaders/GaussianBlurY.PS.hlsl", gaussianBlurYPipelineState_);
 }
 
 void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
@@ -394,33 +423,57 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
     assert(device);
     assert(rtvDescriptorHeap);
     assert(srvManager);
-    assert(srvManager->CanAllocate());
 
     CreateCopyPipelineState();
-
-    renderTextureResource_.Reset();
-    renderTextureResource_.Attach(CreateRenderTextureResource(
-        device.Get(),
-        WinApp::kClientWidth,
-        WinApp::kClientHeight,
-        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-        renderTextureClearColor_.data()));
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
     rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    renderTextureRTVHandle_ = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    renderTextureRTVHandle_.ptr += static_cast<SIZE_T>(descriptorSizeRTV) * 2;
-    device->CreateRenderTargetView(renderTextureResource_.Get(), &rtvDesc, renderTextureRTVHandle_);
+    auto CreateOffscreenTexture = [&](Microsoft::WRL::ComPtr<ID3D12Resource>& resource,
+        D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle,
+        D3D12_CPU_DESCRIPTOR_HANDLE& srvHandleCPU,
+        D3D12_GPU_DESCRIPTOR_HANDLE& srvHandleGPU,
+        uint32_t& srvIndex,
+        uint32_t rtvIndex) {
+            assert(srvManager->CanAllocate());
 
-    renderTextureSRVIndex_ = srvManager->Allocate();
-    renderTextureSRVHandleCPU_ = srvManager->GetCPUDescriptorHandle(renderTextureSRVIndex_);
-    renderTextureSRVHandleGPU_ = srvManager->GetGPUDescriptorHandle(renderTextureSRVIndex_);
-    srvManager->CreateSRVforTexture2D(
+            resource.Reset();
+            resource.Attach(CreateRenderTextureResource(
+                device.Get(),
+                WinApp::kClientWidth,
+                WinApp::kClientHeight,
+                DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+                renderTextureClearColor_.data()));
+
+            rtvHandle = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+            rtvHandle.ptr += static_cast<SIZE_T>(descriptorSizeRTV) * rtvIndex;
+            device->CreateRenderTargetView(resource.Get(), &rtvDesc, rtvHandle);
+
+            srvIndex = srvManager->Allocate();
+            srvHandleCPU = srvManager->GetCPUDescriptorHandle(srvIndex);
+            srvHandleGPU = srvManager->GetGPUDescriptorHandle(srvIndex);
+            srvManager->CreateSRVforTexture2D(
+                srvIndex,
+                resource.Get(),
+                DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+                1);
+        };
+
+    CreateOffscreenTexture(
+        renderTextureResource_,
+        renderTextureRTVHandle_,
+        renderTextureSRVHandleCPU_,
+        renderTextureSRVHandleGPU_,
         renderTextureSRVIndex_,
-        renderTextureResource_.Get(),
-        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-        1);
+        2);
+
+    CreateOffscreenTexture(
+        gaussianIntermediateResource_,
+        gaussianIntermediateRTVHandle_,
+        gaussianIntermediateSRVHandleCPU_,
+        gaussianIntermediateSRVHandleGPU_,
+        gaussianIntermediateSRVIndex_,
+        3);
 
     const size_t postEffectBufferSize = (sizeof(PostEffectParameters) + 0xff) & ~static_cast<size_t>(0xff);
     postEffectResource_ = CreateBufferResource(postEffectBufferSize);
@@ -615,7 +668,7 @@ void DirectXCommon::CreateDescriptorHeaps()
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc{};
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        desc.NumDescriptors = 3;
+        desc.NumDescriptors = 4;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         hr = device->CreateDescriptorHeap(&desc,
             IID_PPV_ARGS(&rtvDescriptorHeap));

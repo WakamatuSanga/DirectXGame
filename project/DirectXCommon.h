@@ -21,6 +21,10 @@ class SrvManager;
 class DirectXCommon {
 public:
     struct PostEffectParameters {
+        uint32_t gaussianEnabled = 0;
+        float gaussianIntensity = 1.0f;
+        uint32_t smoothingEnabled = 0;
+        float smoothingIntensity = 1.0f;
         uint32_t grayscaleEnabled = 0;
         float grayscaleIntensity = 1.0f;
         uint32_t sepiaEnabled = 0;
@@ -207,9 +211,16 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE renderTextureSRVHandleCPU_{};
     D3D12_GPU_DESCRIPTOR_HANDLE renderTextureSRVHandleGPU_{};
     uint32_t renderTextureSRVIndex_ = 0;
+    Microsoft::WRL::ComPtr<ID3D12Resource> gaussianIntermediateResource_;
+    D3D12_CPU_DESCRIPTOR_HANDLE gaussianIntermediateRTVHandle_{};
+    D3D12_CPU_DESCRIPTOR_HANDLE gaussianIntermediateSRVHandleCPU_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE gaussianIntermediateSRVHandleGPU_{};
+    uint32_t gaussianIntermediateSRVIndex_ = 0;
     std::array<float, 4> renderTextureClearColor_ = { 0.05f, 0.05f, 0.1f, 1.0f };
     Microsoft::WRL::ComPtr<ID3D12RootSignature> copyRootSignature_;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> copyPipelineState_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> gaussianBlurXPipelineState_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> gaussianBlurYPipelineState_;
     Microsoft::WRL::ComPtr<ID3D12Resource> postEffectResource_;
     PostEffectParameters* postEffectData_ = nullptr;
     PostEffectParameters postEffectParameters_{};
