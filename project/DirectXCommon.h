@@ -14,6 +14,7 @@
 #include <cstdint>
 
 #include "WinApp.h"
+class SrvManager;
 #include "externals/DirectXTex/DirectXTex.h" // TexMetadata / ScratchImage 用
 
 // DirectX 基盤クラス
@@ -28,7 +29,10 @@ public:
 
     // 毎フレームの前処理 / 後処理
     void PreDraw();
+    void PrepareSwapChainForImGui();
+    void CopyRenderTextureToSwapChain();
     void PostDraw();
+    void CreateRenderTexture(SrvManager* srvManager);
 
     // 最大SRV数（最大テクスチャ枚数）
     static const uint32_t kMaxSRVCount;
@@ -53,6 +57,12 @@ public:
     }
 
     // SRV 用ディスクリプタハンドル
+    ID3D12Resource* GetRenderTextureResource() const { return renderTextureResource_.Get(); }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTextureRTV() const { return renderTextureRTVHandle_; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTextureSRVCPUHandle() const { return renderTextureSRVHandleCPU_; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetRenderTextureSRVGPUHandle() const { return renderTextureSRVHandleGPU_; }
+    uint32_t GetRenderTextureSRVIndex() const { return renderTextureSRVIndex_; }
+    const std::array<float, 4>& GetRenderTextureClearColor() const { return renderTextureClearColor_; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
     D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
 
@@ -108,6 +118,8 @@ private:
     void InitializeScissorRect();
     // DXC コンパイラの生成
     void CreateDXCCompiler();
+    void CreateCopyRootSignature();
+    void CreateCopyPipelineState();
     // ImGui の初期化
     void InitializeImGui();
 
@@ -177,4 +189,12 @@ private:
 
     // バックバッファ 2 枚分の RTV
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2]{};
+    Microsoft::WRL::ComPtr<ID3D12Resource> renderTextureResource_;
+    D3D12_CPU_DESCRIPTOR_HANDLE renderTextureRTVHandle_{};
+    D3D12_CPU_DESCRIPTOR_HANDLE renderTextureSRVHandleCPU_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE renderTextureSRVHandleGPU_{};
+    uint32_t renderTextureSRVIndex_ = 0;
+    std::array<float, 4> renderTextureClearColor_ = { 0.05f, 0.05f, 0.1f, 1.0f };
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> copyRootSignature_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> copyPipelineState_;
 };
