@@ -54,6 +54,10 @@ void MyGame::Initialize() {
     modelManager_->LoadModel("resources/obj/sphere/sphere.obj");
     texManager_->LoadTexture("resources/obj/fence/fence.png");
     texManager_->LoadTexture("resources/obj/axis/uvChecker.png");
+    texManager_->LoadTexture("resources/postEffect/noise0.png");
+    texManager_->LoadTexture("resources/postEffect/noise1.png");
+    dxCommon_->SetDissolveNoiseTextureIndex(
+        texManager_->GetTextureIndexByFilePath("resources/postEffect/noise0.png"));
     audio_->LoadAudio("resources/sounds/Alarm01.mp3");
 
     SceneManager::GetInstance()->ChangeScene(std::make_unique<TitleScene>());

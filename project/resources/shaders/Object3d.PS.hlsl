@@ -21,12 +21,23 @@ struct EnvironmentMapData
     float2 padding;
 };
 
+struct DissolveData
+{
+    int enableDissolve;
+    float threshold;
+    float edgeWidth;
+    float edgeGlowStrength;
+    float4 edgeColor;
+};
+
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<EnvironmentMapData> gEnvironmentMapData : register(b2);
+ConstantBuffer<DissolveData> gDissolveData : register(b3);
 
 Texture2D<float4> gTexture : register(t0);
 TextureCube<float4> gEnvironmentTexture : register(t1);
+Texture2D<float4> gDissolveMaskTexture : register(t2);
 SamplerState gSampler : register(s0);
 
 struct VertexShaderOutput
@@ -47,6 +58,14 @@ PixelShaderOutput main(VertexShaderOutput input)
 {
     float4 transformedUV = mul(float4(input.uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 texColor = gTexture.Sample(gSampler, transformedUV.xy);
+    float dissolveEdge = 0.0f;
+    if (gDissolveData.enableDissolve != 0)
+    {
+        float dissolveMask = gDissolveMaskTexture.Sample(gSampler, transformedUV.xy).r;
+        clip(dissolveMask - gDissolveData.threshold);
+        float edgeWidth = max(gDissolveData.edgeWidth, 0.0001f);
+        dissolveEdge = 1.0f - smoothstep(gDissolveData.threshold, gDissolveData.threshold + edgeWidth, dissolveMask);
+    }
     
     // Zバッファの不具合を防ぐため透明な部分は破棄
     if (texColor.a <= 0.5f)
@@ -86,6 +105,12 @@ PixelShaderOutput main(VertexShaderOutput input)
         float3 reflection = reflect(-V, N);
         float3 reflectionColor = gEnvironmentTexture.Sample(gSampler, reflection).rgb;
         outputColor.rgb = lerp(outputColor.rgb, reflectionColor, saturate(gEnvironmentMapData.intensity));
+    }
+
+    if (gDissolveData.enableDissolve != 0)
+    {
+        outputColor.rgb = lerp(outputColor.rgb, gDissolveData.edgeColor.rgb, saturate(dissolveEdge * gDissolveData.edgeColor.a));
+        outputColor.rgb += gDissolveData.edgeColor.rgb * dissolveEdge * gDissolveData.edgeGlowStrength;
     }
 
     PixelShaderOutput output;

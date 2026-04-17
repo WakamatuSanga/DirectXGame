@@ -14,6 +14,7 @@ void Object3d::Initialize(Object3dCommon* object3dCommon) {
     CreateTransformationMatrixResource();
     CreateDirectionalLightResource();
     CreateEnvironmentMapResource();
+    CreateDissolveResource();
 }
 
 void Object3d::Update() {
@@ -44,9 +45,13 @@ void Object3d::Draw() {
     commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(4, environmentMapResource_->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(6, dissolveResource_->GetGPUVirtualAddress());
 
     if (environmentTextureIndex_ != static_cast<uint32_t>(-1)) {
         commandList->SetGraphicsRootDescriptorTable(5, TextureManager::GetInstance()->GetSrvHandleGPU(environmentTextureIndex_));
+    }
+    if (dissolveMaskTextureIndex_ != static_cast<uint32_t>(-1)) {
+        commandList->SetGraphicsRootDescriptorTable(7, TextureManager::GetInstance()->GetSrvHandleGPU(dissolveMaskTextureIndex_));
     }
 
     if (model_) {
@@ -79,4 +84,22 @@ void Object3d::CreateEnvironmentMapResource() {
     environmentMapData_->intensity = 1.0f;
     environmentMapData_->padding[0] = 0.0f;
     environmentMapData_->padding[1] = 0.0f;
+}
+
+void Object3d::SetDissolveMaskTexture(const std::string& path)
+{
+    TextureManager::GetInstance()->LoadTexture(path);
+    dissolveMaskTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(path);
+}
+
+void Object3d::CreateDissolveResource()
+{
+    dissolveResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(DissolveData));
+    dissolveResource_->Map(0, nullptr, reinterpret_cast<void**>(&dissolveData_));
+    dissolveData_->enableDissolve = 0;
+    dissolveData_->threshold = 0.0f;
+    dissolveData_->edgeWidth = 0.05f;
+    dissolveData_->edgeGlowStrength = 0.5f;
+    dissolveData_->edgeColor = { 1.0f, 0.5f, 0.1f, 1.0f };
+    SetDissolveMaskTexture("resources/postEffect/noise0.png");
 }
