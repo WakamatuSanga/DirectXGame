@@ -2,6 +2,7 @@
 
 Texture2D<float4> gTexture : register(t0);
 Texture2D<float> gDepthTexture : register(t1);
+Texture2D<float4> gNormalTexture : register(t2);
 SamplerState gSampler : register(s0);
 ConstantBuffer<PostEffectParameters> gPostEffectParameters : register(b0);
 
@@ -76,6 +77,15 @@ float ApplyDepthOutlineResponse(float edge)
     return saturate(edge * gPostEffectParameters.outlineIntensity);
 }
 
+float ApplyNormalOutlineResponse(float edge)
+{
+    float threshold = gPostEffectParameters.outlineNormalThreshold;
+    float softness = max(gPostEffectParameters.outlineSoftness, 0.0001f);
+    edge = smoothstep(threshold, threshold + softness, edge);
+    edge *= gPostEffectParameters.outlineNormalStrength;
+    return saturate(edge * gPostEffectParameters.outlineIntensity);
+}
+
 float ComputeColorDiff8Edge(float2 texcoord, float2 thickness)
 {
     float3 center = SampleOutlineSource(texcoord);
@@ -132,13 +142,38 @@ float SampleDepth(float2 texcoord)
     return gDepthTexture.Sample(gSampler, texcoord);
 }
 
+float3 SampleNormal(float2 texcoord)
+{
+    float3 normal = gNormalTexture.Sample(gSampler, texcoord).xyz * 2.0f - 1.0f;
+    float lengthSquared = dot(normal, normal);
+    if (lengthSquared > 0.0001f) {
+        normal *= rsqrt(lengthSquared);
+    } else {
+        normal = 0.0f;
+    }
+    return normal;
+}
+
+float LinearizeDepth(float depth)
+{
+    float nearZ = gPostEffectParameters.depthNear;
+    float farZ = gPostEffectParameters.depthFar;
+    float linearDepth = (nearZ * farZ) / max(farZ - depth * (farZ - nearZ), 0.0001f);
+    return saturate((linearDepth - nearZ) / max(farZ - nearZ, 0.0001f));
+}
+
+float SampleLinearDepth(float2 texcoord)
+{
+    return LinearizeDepth(SampleDepth(texcoord));
+}
+
 float ComputeDepthEdge(float2 texcoord, float2 thickness)
 {
-    float centerDepth = SampleDepth(texcoord);
-    float leftDepth = SampleDepth(texcoord + float2(-thickness.x, 0.0f));
-    float rightDepth = SampleDepth(texcoord + float2(thickness.x, 0.0f));
-    float upDepth = SampleDepth(texcoord + float2(0.0f, -thickness.y));
-    float downDepth = SampleDepth(texcoord + float2(0.0f, thickness.y));
+    float centerDepth = SampleLinearDepth(texcoord);
+    float leftDepth = SampleLinearDepth(texcoord + float2(-thickness.x, 0.0f));
+    float rightDepth = SampleLinearDepth(texcoord + float2(thickness.x, 0.0f));
+    float upDepth = SampleLinearDepth(texcoord + float2(0.0f, -thickness.y));
+    float downDepth = SampleLinearDepth(texcoord + float2(0.0f, thickness.y));
 
     float edge = 0.0f;
     edge = max(edge, abs(centerDepth - leftDepth));
@@ -146,6 +181,22 @@ float ComputeDepthEdge(float2 texcoord, float2 thickness)
     edge = max(edge, abs(centerDepth - upDepth));
     edge = max(edge, abs(centerDepth - downDepth));
 
+    return edge;
+}
+
+float ComputeNormalEdge(float2 texcoord, float2 thickness)
+{
+    float3 centerNormal = SampleNormal(texcoord);
+    float3 leftNormal = SampleNormal(texcoord + float2(-thickness.x, 0.0f));
+    float3 rightNormal = SampleNormal(texcoord + float2(thickness.x, 0.0f));
+    float3 upNormal = SampleNormal(texcoord + float2(0.0f, -thickness.y));
+    float3 downNormal = SampleNormal(texcoord + float2(0.0f, thickness.y));
+
+    float edge = 0.0f;
+    edge = max(edge, length(centerNormal - leftNormal));
+    edge = max(edge, length(centerNormal - rightNormal));
+    edge = max(edge, length(centerNormal - upNormal));
+    edge = max(edge, length(centerNormal - downNormal));
     return edge;
 }
 
@@ -168,6 +219,28 @@ float ComputeHybridEdge(float2 texcoord, float2 thickness)
         edgeDepth * gPostEffectParameters.hybridDepthWeight);
 }
 
+float ComputeFinalHybridEdge(float2 texcoord, float2 thickness)
+{
+    float edgeColor = 0.0f;
+    if (gPostEffectParameters.hybridColorSource == 1) {
+        edgeColor = ComputeColorDiff8Edge(texcoord, thickness);
+    } else {
+        edgeColor = ComputeSobelEdge(texcoord, thickness);
+    }
+
+    float edgeDepth = ComputeDepthEdge(texcoord, thickness);
+    float edgeNormal = ComputeNormalEdge(texcoord, thickness);
+
+    edgeColor = ApplyOutlineResponse(edgeColor);
+    edgeDepth = ApplyDepthOutlineResponse(edgeDepth);
+    edgeNormal = ApplyNormalOutlineResponse(edgeNormal);
+
+    return saturate(
+        edgeColor * gPostEffectParameters.hybridColorWeight +
+        edgeDepth * gPostEffectParameters.hybridDepthWeight +
+        edgeNormal * gPostEffectParameters.hybridNormalWeight);
+}
+
 float3 ApplyOutline(float2 texcoord, float3 baseColor)
 {
     uint width, height;
@@ -187,6 +260,11 @@ float3 ApplyOutline(float2 texcoord, float3 baseColor)
         edge = ApplyDepthOutlineResponse(edge);
     } else if (gPostEffectParameters.outlineMode == 4) {
         edge = ComputeHybridEdge(texcoord, thickness);
+    } else if (gPostEffectParameters.outlineMode == 5) {
+        edge = ComputeNormalEdge(texcoord, thickness);
+        edge = ApplyNormalOutlineResponse(edge);
+    } else if (gPostEffectParameters.outlineMode == 6) {
+        edge = ComputeFinalHybridEdge(texcoord, thickness);
     }
 
     return lerp(baseColor, gPostEffectParameters.outlineColor.rgb, edge);

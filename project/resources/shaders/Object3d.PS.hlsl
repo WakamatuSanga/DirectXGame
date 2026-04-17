@@ -37,7 +37,13 @@ struct VertexShaderOutput
     float3 worldPos : TEXCOORD1;
 };
 
-float4 main(VertexShaderOutput input) : SV_TARGET
+struct PixelShaderOutput
+{
+    float4 color : SV_TARGET0;
+    float4 normal : SV_TARGET1;
+};
+
+PixelShaderOutput main(VertexShaderOutput input)
 {
     float4 transformedUV = mul(float4(input.uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 texColor = gTexture.Sample(gSampler, transformedUV.xy);
@@ -82,5 +88,8 @@ float4 main(VertexShaderOutput input) : SV_TARGET
         outputColor.rgb = lerp(outputColor.rgb, reflectionColor, saturate(gEnvironmentMapData.intensity));
     }
 
-    return outputColor;
+    PixelShaderOutput output;
+    output.color = outputColor;
+    output.normal = float4(normalize(input.normal) * 0.5f + 0.5f, 1.0f);
+    return output;
 }
