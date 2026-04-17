@@ -23,6 +23,35 @@ float3 ApplyGaussianBlurVertical(float2 texcoord)
     return color;
 }
 
+float3 SampleRadialBlurSource(float2 texcoord)
+{
+    return ApplyGaussianBlurVertical(texcoord);
+}
+
+float3 ApplyRadialBlur(float2 texcoord, float3 baseColor)
+{
+    if (gPostEffectParameters.radialBlurEnabled == 0 || gPostEffectParameters.radialBlurStrength <= 0.0001f) {
+        return baseColor;
+    }
+
+    uint sampleCount = clamp(gPostEffectParameters.radialBlurSampleCount, 1u, 32u);
+    if (sampleCount <= 1u) {
+        return baseColor;
+    }
+
+    float2 direction = texcoord - gPostEffectParameters.radialBlurCenter;
+    float3 accumulatedColor = baseColor;
+
+    [loop]
+    for (uint i = 1; i < sampleCount; ++i) {
+        float t = (float)i / (float)(sampleCount - 1u);
+        float2 sampleUV = texcoord - direction * (gPostEffectParameters.radialBlurStrength * t);
+        accumulatedColor += SampleRadialBlurSource(sampleUV);
+    }
+
+    return accumulatedColor / float(sampleCount);
+}
+
 float3 ApplySmoothing(float2 texcoord, float3 baseColor, float intensity)
 {
     uint width, height;
@@ -298,6 +327,7 @@ float4 main(VertexShaderOutput input) : SV_TARGET
     float invertIntensity = gPostEffectParameters.invertIntensity * gPostEffectParameters.invertEnabled;
     float vignetteIntensity = gPostEffectParameters.vignetteIntensity * gPostEffectParameters.vignetteEnabled;
 
+    color = ApplyRadialBlur(input.texcoord, color);
     color = ApplySmoothing(input.texcoord, color, smoothingIntensity);
     color = ApplyGrayscale(color, grayscaleIntensity);
     color = ApplySepia(color, sepiaIntensity);

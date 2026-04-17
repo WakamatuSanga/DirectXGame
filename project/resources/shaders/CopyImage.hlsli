@@ -18,6 +18,10 @@ struct PostEffectParameters
     float invertIntensity;
     uint vignetteEnabled;
     float vignetteIntensity;
+    uint radialBlurEnabled;
+    float radialBlurStrength;
+    float2 radialBlurCenter;
+    uint radialBlurSampleCount;
     uint outlineMode;
     float outlineIntensity;
     float outlineThickness;
@@ -33,6 +37,5 @@ struct PostEffectParameters
     float hybridNormalWeight;
     float depthNear;
     float depthFar;
-    float postEffectPadding;
     float4 outlineColor;
 };
