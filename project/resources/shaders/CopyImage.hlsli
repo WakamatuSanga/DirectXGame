@@ -25,9 +25,14 @@ struct PostEffectParameters
     float outlineSoftness;
     float outlineDepthThreshold;
     float outlineDepthStrength;
+    float outlineNormalThreshold;
+    float outlineNormalStrength;
     uint hybridColorSource;
     float hybridColorWeight;
     float hybridDepthWeight;
-    float2 outlinePadding;
+    float hybridNormalWeight;
+    float depthNear;
+    float depthFar;
+    float postEffectPadding;
     float4 outlineColor;
 };

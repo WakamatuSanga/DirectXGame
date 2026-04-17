@@ -40,10 +40,15 @@ public:
         float outlineSoftness = 0.05f;
         float outlineDepthThreshold = 0.002f;
         float outlineDepthStrength = 10.0f;
+        float outlineNormalThreshold = 0.1f;
+        float outlineNormalStrength = 4.0f;
         uint32_t hybridColorSource = 2;
         float hybridColorWeight = 1.0f;
         float hybridDepthWeight = 1.0f;
-        std::array<float, 2> outlinePadding = { 0.0f, 0.0f };
+        float hybridNormalWeight = 1.0f;
+        float depthNear = 0.1f;
+        float depthFar = 100.0f;
+        std::array<float, 1> postEffectPadding = { 0.0f };
         std::array<float, 4> outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     };
 
@@ -229,12 +234,18 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE renderTextureSRVHandleCPU_{};
     D3D12_GPU_DESCRIPTOR_HANDLE renderTextureSRVHandleGPU_{};
     uint32_t renderTextureSRVIndex_ = 0;
+    Microsoft::WRL::ComPtr<ID3D12Resource> normalTextureResource_;
+    D3D12_CPU_DESCRIPTOR_HANDLE normalTextureRTVHandle_{};
+    D3D12_CPU_DESCRIPTOR_HANDLE normalTextureSRVHandleCPU_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE normalTextureSRVHandleGPU_{};
+    uint32_t normalTextureSRVIndex_ = 0;
     Microsoft::WRL::ComPtr<ID3D12Resource> gaussianIntermediateResource_;
     D3D12_CPU_DESCRIPTOR_HANDLE gaussianIntermediateRTVHandle_{};
     D3D12_CPU_DESCRIPTOR_HANDLE gaussianIntermediateSRVHandleCPU_{};
     D3D12_GPU_DESCRIPTOR_HANDLE gaussianIntermediateSRVHandleGPU_{};
     uint32_t gaussianIntermediateSRVIndex_ = 0;
     std::array<float, 4> renderTextureClearColor_ = { 0.05f, 0.05f, 0.1f, 1.0f };
+    std::array<float, 4> normalTextureClearColor_ = { 0.5f, 0.5f, 0.5f, 1.0f };
     Microsoft::WRL::ComPtr<ID3D12RootSignature> copyRootSignature_;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> copyPipelineState_;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> gaussianBlurXPipelineState_;

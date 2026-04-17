@@ -151,8 +151,9 @@ void Object3dCommon::CreateGraphicsPipelineStates()
     graphicsPipelineStateDesc.RasterizerState = rasterizerDesc;
     graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
     graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    graphicsPipelineStateDesc.NumRenderTargets = 1;
+    graphicsPipelineStateDesc.NumRenderTargets = 2;
     graphicsPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    graphicsPipelineStateDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
     graphicsPipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     graphicsPipelineStateDesc.SampleDesc.Count = 1;
     graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
@@ -163,6 +164,8 @@ void Object3dCommon::CreateGraphicsPipelineStates()
     // Helper lambda
     auto CreatePSO = [&](BlendMode mode, const D3D12_BLEND_DESC& blendDesc) {
         graphicsPipelineStateDesc.BlendState = blendDesc;
+        graphicsPipelineStateDesc.BlendState.RenderTarget[1].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        graphicsPipelineStateDesc.BlendState.RenderTarget[1].BlendEnable = FALSE;
         hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
             &graphicsPipelineStateDesc,
             IID_PPV_ARGS(&graphicsPipelineStates_[(size_t)mode]));

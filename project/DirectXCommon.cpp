@@ -117,6 +117,7 @@ void DirectXCommon::PrepareSwapChainForImGui()
 void DirectXCommon::CopyRenderTextureToSwapChain()
 {
     assert(renderTextureResource_);
+    assert(normalTextureResource_);
     assert(depthBuffer);
     assert(copyRootSignature_);
     assert(copyPipelineState_);
@@ -146,7 +147,8 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
         commandList->SetPipelineState(pipelineState);
         commandList->SetGraphicsRootDescriptorTable(0, sourceSRV);
         commandList->SetGraphicsRootDescriptorTable(1, depthTextureSRVHandleGPU_);
-        commandList->SetGraphicsRootConstantBufferView(2, postEffectResource_->GetGPUVirtualAddress());
+        commandList->SetGraphicsRootDescriptorTable(2, normalTextureSRVHandleGPU_);
+        commandList->SetGraphicsRootConstantBufferView(3, postEffectResource_->GetGPUVirtualAddress());
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
         };
@@ -160,6 +162,7 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
         assert(gaussianBlurYPipelineState_);
 
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        TransitionResource(normalTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         DrawFullscreenPass(gaussianBlurXPipelineState_.Get(), renderTextureSRVHandleGPU_, gaussianIntermediateRTVHandle_);
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -167,12 +170,15 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
         TransitionResource(gaussianIntermediateResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         DrawFullscreenPass(gaussianBlurYPipelineState_.Get(), gaussianIntermediateSRVHandleGPU_, backBufferRTV);
         TransitionResource(gaussianIntermediateResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        TransitionResource(normalTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
         TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     } else {
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        TransitionResource(normalTextureResource_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         DrawFullscreenPass(copyPipelineState_.Get(), renderTextureSRVHandleGPU_, backBufferRTV);
         TransitionResource(renderTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        TransitionResource(normalTextureResource_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
         TransitionResource(depthBuffer.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     }
 }
@@ -235,7 +241,10 @@ void DirectXCommon::Finalize()
 // --------------------
 void DirectXCommon::PreDraw()
 {
+    assert(renderTextureResource_);
+    assert(normalTextureResource_);
     D3D12_CPU_DESCRIPTOR_HANDLE sceneRTVHandle = renderTextureRTVHandle_;
+    D3D12_CPU_DESCRIPTOR_HANDLE normalRTVHandle = normalTextureRTVHandle_;
 
     // PRESENT → RENDER_TARGET
     /*
@@ -248,13 +257,14 @@ void DirectXCommon::PreDraw()
     */
 
     // RTV / DSV 設定
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = sceneRTVHandle;
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[] = { sceneRTVHandle, normalRTVHandle };
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle =
         dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    commandList->OMSetRenderTargets(_countof(rtvHandles), rtvHandles, FALSE, &dsvHandle);
 
     // 画面クリア
-    commandList->ClearRenderTargetView(rtvHandle, renderTextureClearColor_.data(), 0, nullptr);
+    commandList->ClearRenderTargetView(sceneRTVHandle, renderTextureClearColor_.data(), 0, nullptr);
+    commandList->ClearRenderTargetView(normalRTVHandle, normalTextureClearColor_.data(), 0, nullptr);
 
     // 深度クリア
     commandList->ClearDepthStencilView(
@@ -321,7 +331,7 @@ void DirectXCommon::CreateCopyRootSignature()
 {
     HRESULT hr = S_OK;
 
-    D3D12_DESCRIPTOR_RANGE descriptorRanges[2]{};
+    D3D12_DESCRIPTOR_RANGE descriptorRanges[3]{};
     descriptorRanges[0].BaseShaderRegister = 0;
     descriptorRanges[0].NumDescriptors = 1;
     descriptorRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -332,7 +342,12 @@ void DirectXCommon::CreateCopyRootSignature()
     descriptorRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootParameters[3]{};
+    descriptorRanges[2].BaseShaderRegister = 2;
+    descriptorRanges[2].NumDescriptors = 1;
+    descriptorRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRanges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    D3D12_ROOT_PARAMETER rootParameters[4]{};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRanges[0];
@@ -343,10 +358,15 @@ void DirectXCommon::CreateCopyRootSignature()
     rootParameters[1].DescriptorTable.pDescriptorRanges = &descriptorRanges[1];
     rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
 
-    rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameters[2].Descriptor.ShaderRegister = 0;
-    rootParameters[2].Descriptor.RegisterSpace = 0;
+    rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRanges[2];
+    rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
+
+    rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[3].Descriptor.ShaderRegister = 0;
+    rootParameters[3].Descriptor.RegisterSpace = 0;
 
     D3D12_STATIC_SAMPLER_DESC staticSampler{};
     staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -452,7 +472,9 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
         D3D12_CPU_DESCRIPTOR_HANDLE& srvHandleCPU,
         D3D12_GPU_DESCRIPTOR_HANDLE& srvHandleGPU,
         uint32_t& srvIndex,
-        uint32_t rtvIndex) {
+        uint32_t rtvIndex,
+        DXGI_FORMAT format,
+        const std::array<float, 4>& clearColor) {
             assert(srvManager->CanAllocate());
 
             resource.Reset();
@@ -460,11 +482,12 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
                 device.Get(),
                 WinApp::kClientWidth,
                 WinApp::kClientHeight,
-                DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-                renderTextureClearColor_.data()));
+                format,
+                clearColor.data()));
 
             rtvHandle = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
             rtvHandle.ptr += static_cast<SIZE_T>(descriptorSizeRTV) * rtvIndex;
+            rtvDesc.Format = format;
             device->CreateRenderTargetView(resource.Get(), &rtvDesc, rtvHandle);
 
             srvIndex = srvManager->Allocate();
@@ -473,7 +496,7 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
             srvManager->CreateSRVforTexture2D(
                 srvIndex,
                 resource.Get(),
-                DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+                format,
                 1);
         };
 
@@ -483,7 +506,19 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
         renderTextureSRVHandleCPU_,
         renderTextureSRVHandleGPU_,
         renderTextureSRVIndex_,
-        2);
+        2,
+        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+        renderTextureClearColor_);
+
+    CreateOffscreenTexture(
+        normalTextureResource_,
+        normalTextureRTVHandle_,
+        normalTextureSRVHandleCPU_,
+        normalTextureSRVHandleGPU_,
+        normalTextureSRVIndex_,
+        3,
+        DXGI_FORMAT_R8G8B8A8_UNORM,
+        normalTextureClearColor_);
 
     CreateOffscreenTexture(
         gaussianIntermediateResource_,
@@ -491,7 +526,9 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
         gaussianIntermediateSRVHandleCPU_,
         gaussianIntermediateSRVHandleGPU_,
         gaussianIntermediateSRVIndex_,
-        3);
+        4,
+        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+        renderTextureClearColor_);
 
     assert(srvManager->CanAllocate());
     depthTextureSRVIndex_ = srvManager->Allocate();
@@ -696,7 +733,7 @@ void DirectXCommon::CreateDescriptorHeaps()
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc{};
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        desc.NumDescriptors = 4;
+        desc.NumDescriptors = 5;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         hr = device->CreateDescriptorHeap(&desc,
             IID_PPV_ARGS(&rtvDescriptorHeap));
@@ -844,11 +881,6 @@ void DirectXCommon::CreateDXCCompiler()
 //        srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 //        srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 //}
-
-// ============================================================
-// ここから スライドで「自分で考えよう」となっている各種関数
-// ============================================================
-
 // シェーダーコンパイル
 ComPtr<IDxcBlob> DirectXCommon::CompileShader(
     const std::wstring& filePath,
