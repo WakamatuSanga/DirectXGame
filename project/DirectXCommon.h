@@ -33,6 +33,10 @@ public:
         float invertIntensity = 1.0f;
         uint32_t vignetteEnabled = 0;
         float vignetteIntensity = 1.0f;
+        uint32_t radialBlurEnabled = 0;
+        float radialBlurStrength = 0.02f;
+        std::array<float, 2> radialBlurCenter = { 0.5f, 0.5f };
+        uint32_t radialBlurSampleCount = 8;
         uint32_t outlineMode = 0;
         float outlineIntensity = 1.0f;
         float outlineThickness = 1.0f;
@@ -48,7 +52,6 @@ public:
         float hybridNormalWeight = 1.0f;
         float depthNear = 0.1f;
         float depthFar = 100.0f;
-        std::array<float, 1> postEffectPadding = { 0.0f };
         std::array<float, 4> outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     };
 

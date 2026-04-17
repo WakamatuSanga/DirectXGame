@@ -14,6 +14,14 @@
 #endif
 
 namespace {
+    struct RadialBlurPreset {
+        const char* name;
+        uint32_t enabled;
+        float strength;
+        std::array<float, 2> center;
+        uint32_t sampleCount;
+    };
+
     struct OutlinePreset {
         const char* name;
         uint32_t outlineMode;
@@ -41,6 +49,13 @@ namespace {
         { "FinalHybrid Color Emphasis", 6u, 2u, 1.45f, 0.55f, 0.65f, 2.80f, 1.15f, 0.055f, 0.025f, 0.0025f, 10.0f, 0.12f, 3.5f, { 0.02f, 0.02f, 0.02f, 1.0f } },
         { "FinalHybrid Depth Emphasis", 6u, 1u, 0.55f, 1.55f, 0.70f, 2.60f, 1.20f, 0.060f, 0.030f, 0.0010f, 18.0f, 0.12f, 3.5f, { 0.02f, 0.02f, 0.02f, 1.0f } },
         { "FinalHybrid Normal Emphasis", 6u, 2u, 0.65f, 0.75f, 1.65f, 2.50f, 1.15f, 0.050f, 0.025f, 0.0015f, 12.0f, 0.08f, 5.5f, { 0.02f, 0.02f, 0.02f, 1.0f } },
+    };
+
+    constexpr RadialBlurPreset kRadialBlurPresets[] = {
+        { "Weak", 1u, 0.010f, { 0.5f, 0.5f }, 6u },
+        { "Medium", 1u, 0.020f, { 0.5f, 0.5f }, 8u },
+        { "Strong", 1u, 0.040f, { 0.5f, 0.5f }, 12u },
+        { "Dramatic", 1u, 0.060f, { 0.5f, 0.5f }, 16u },
     };
 }
 
@@ -280,6 +295,12 @@ void GameScene::Update() {
         std::string sliderLabel = std::string(label) + " Strength";
         ImGui::SliderFloat(sliderLabel.c_str(), &intensity, 0.0f, 1.0f, "%.2f");
         };
+    auto ApplyRadialBlurPreset = [&](const RadialBlurPreset& preset) {
+        postEffectParams.radialBlurEnabled = preset.enabled;
+        postEffectParams.radialBlurStrength = preset.strength;
+        postEffectParams.radialBlurCenter = preset.center;
+        postEffectParams.radialBlurSampleCount = preset.sampleCount;
+    };
     auto ApplyOutlinePreset = [&](const OutlinePreset& preset) {
         postEffectParams.outlineMode = preset.outlineMode;
         postEffectParams.hybridColorSource = preset.hybridColorSource;
@@ -301,6 +322,21 @@ void GameScene::Update() {
         postEffectParams.gaussianEnabled = gaussianEnabled ? 1u : 0u;
     }
     ImGui::SliderFloat("Gaussian Strength", &postEffectParams.gaussianIntensity, 0.0f, 4.0f, "%.2f");
+    bool radialBlurEnabled = postEffectParams.radialBlurEnabled != 0;
+    if (ImGui::Checkbox("RadialBlur", &radialBlurEnabled)) {
+        postEffectParams.radialBlurEnabled = radialBlurEnabled ? 1u : 0u;
+    }
+    static int radialBlurPresetIndex = 1;
+    const char* radialBlurPresetNames[] = { "Weak", "Medium", "Strong", "Dramatic" };
+    if (ImGui::Combo("RadialBlur Preset", &radialBlurPresetIndex, radialBlurPresetNames, IM_ARRAYSIZE(radialBlurPresetNames))) {
+        ApplyRadialBlurPreset(kRadialBlurPresets[radialBlurPresetIndex]);
+    }
+    ImGui::SliderFloat("RadialBlur Strength", &postEffectParams.radialBlurStrength, 0.0f, 0.2f, "%.3f");
+    ImGui::SliderFloat2("RadialBlur Center", postEffectParams.radialBlurCenter.data(), 0.0f, 1.0f, "%.2f");
+    int radialBlurSampleCount = static_cast<int>(postEffectParams.radialBlurSampleCount);
+    if (ImGui::SliderInt("RadialBlur Sample Count", &radialBlurSampleCount, 1, 32)) {
+        postEffectParams.radialBlurSampleCount = static_cast<uint32_t>(radialBlurSampleCount);
+    }
     bool outlineEnabled = postEffectParams.outlineMode != 0;
     if (ImGui::Checkbox("Outline", &outlineEnabled)) {
         if (!outlineEnabled) {
