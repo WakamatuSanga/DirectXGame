@@ -37,6 +37,9 @@ public:
         float radialBlurStrength = 0.02f;
         std::array<float, 2> radialBlurCenter = { 0.5f, 0.5f };
         uint32_t radialBlurSampleCount = 8;
+        uint32_t dissolveEnabled = 0;
+        float dissolveThreshold = 0.0f;
+        float dissolveEdgeWidth = 0.05f;
         uint32_t outlineMode = 0;
         float outlineIntensity = 1.0f;
         float outlineThickness = 1.0f;
@@ -52,6 +55,8 @@ public:
         float hybridNormalWeight = 1.0f;
         float depthNear = 0.1f;
         float depthFar = 100.0f;
+        float postEffectPadding = 0.0f;
+        std::array<float, 4> dissolveEdgeColor = { 1.0f, 0.5f, 0.1f, 1.0f };
         std::array<float, 4> outlineColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     };
 
@@ -101,6 +106,7 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetDepthTextureSRVGPUHandle() const { return depthTextureSRVHandleGPU_; }
     uint32_t GetDepthTextureSRVIndex() const { return depthTextureSRVIndex_; }
     const std::array<float, 4>& GetRenderTextureClearColor() const { return renderTextureClearColor_; }
+    void SetDissolveNoiseTextureIndex(uint32_t textureIndex);
     PostEffectParameters& GetPostEffectParameters() { return postEffectParameters_; }
     const PostEffectParameters& GetPostEffectParameters() const { return postEffectParameters_; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
@@ -205,6 +211,9 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE depthTextureSRVHandleCPU_{};
     D3D12_GPU_DESCRIPTOR_HANDLE depthTextureSRVHandleGPU_{};
     uint32_t depthTextureSRVIndex_ = 0;
+    D3D12_CPU_DESCRIPTOR_HANDLE dissolveNoiseTextureSRVHandleCPU_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE dissolveNoiseTextureSRVHandleGPU_{};
+    uint32_t dissolveNoiseTextureSRVIndex_ = 0;
 
     // デスクリプタヒープ
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;

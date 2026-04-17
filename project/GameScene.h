@@ -5,6 +5,7 @@
 #include "Object3d.h"
 #include "Skybox.h"
 #include "Sprite.h"
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -34,17 +35,25 @@ private:
 
     int currentModelTexture_ = 1;
     int currentParticleTexture_ = 0;
+    int currentDissolveNoiseTexture_ = 0;
+    int currentObjectDissolveMaskTexture_ = 0;
     int currentBlendMode_ = 0;
     int targetObjectIndex_ = 1; // 0=Fence, 1=Sphere
 
     bool isSkyboxVisible_ = true;
     bool isSkyboxFollowCamera_ = true;
-    std::string skyboxTexturePath_ = "resources/skybox/rostock_laage_airport_4k.dds";
+    std::string skyboxTexturePath_ = "resources/skybox/skybox.dds";
     Vector3 skyboxScale_ = { 100.0f, 100.0f, 100.0f };
     Vector3 skyboxTranslate_ = { 0.0f, 0.0f, 0.0f };
     std::string particleTexturePath_ = "resources/obj/axis/uvChecker.png";
+    std::string objectDissolveMaskTexturePath_ = "resources/postEffect/noise0.png";
     bool isSphereEnvironmentMapEnabled_ = true;
     float sphereEnvironmentMapIntensity_ = 1.0f;
+    bool isObjectDissolveEnabled_ = false;
+    float objectDissolveThreshold_ = 0.0f;
+    float objectDissolveEdgeWidth_ = 0.05f;
+    float objectDissolveEdgeGlowStrength_ = 0.5f;
+    std::array<float, 4> objectDissolveEdgeColor_ = { 1.0f, 0.5f, 0.1f, 1.0f };
     bool isPrimitivePreviewVisible_ = true;
 
     float layoutStartX_ = -1.4f;

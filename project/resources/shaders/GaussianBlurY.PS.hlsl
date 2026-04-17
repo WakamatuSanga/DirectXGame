@@ -3,6 +3,7 @@
 Texture2D<float4> gTexture : register(t0);
 Texture2D<float> gDepthTexture : register(t1);
 Texture2D<float4> gNormalTexture : register(t2);
+Texture2D<float4> gDissolveNoiseTexture : register(t3);
 SamplerState gSampler : register(s0);
 ConstantBuffer<PostEffectParameters> gPostEffectParameters : register(b0);
 
@@ -316,6 +317,24 @@ float3 ApplyOutline(float2 texcoord, float3 baseColor)
     return lerp(baseColor, gPostEffectParameters.outlineColor.rgb, edge);
 }
 
+float3 ApplyDissolve(float2 texcoord, float3 baseColor)
+{
+    if (gPostEffectParameters.dissolveEnabled == 0) {
+        return baseColor;
+    }
+
+    float noise = gDissolveNoiseTexture.Sample(gSampler, texcoord).r;
+    float threshold = saturate(gPostEffectParameters.dissolveThreshold);
+    float edgeWidth = max(gPostEffectParameters.dissolveEdgeWidth, 0.0001f);
+
+    if (noise < threshold) {
+        discard;
+    }
+
+    float edgeMask = 1.0f - smoothstep(0.0f, edgeWidth, noise - threshold);
+    return lerp(baseColor, gPostEffectParameters.dissolveEdgeColor.rgb, saturate(edgeMask));
+}
+
 float4 main(VertexShaderOutput input) : SV_TARGET
 {
     float4 sampledColor = gTexture.Sample(gSampler, input.texcoord);
@@ -336,6 +355,7 @@ float4 main(VertexShaderOutput input) : SV_TARGET
     if (gPostEffectParameters.outlineMode != 0) {
         color = ApplyOutline(input.texcoord, color);
     }
+    color = ApplyDissolve(input.texcoord, color);
 
     return float4(color, sampledColor.a);
 }

@@ -6,12 +6,21 @@
 #include <wrl.h>
 #include <d3d12.h>
 #include <cstdint>
+#include <string>
 
 class Object3d {
     struct EnvironmentMapData {
         int32_t enableEnvironmentMap;
         float intensity;
         float padding[2];
+    };
+
+    struct DissolveData {
+        int32_t enableDissolve;
+        float threshold;
+        float edgeWidth;
+        float edgeGlowStrength;
+        Vector4 edgeColor;
     };
 
 public:
@@ -39,6 +48,13 @@ public:
     void SetEnvironmentTextureIndex(uint32_t textureIndex) { environmentTextureIndex_ = textureIndex; }
     void SetEnvironmentMapEnabled(bool isEnabled) { environmentMapData_->enableEnvironmentMap = isEnabled ? 1 : 0; }
     void SetEnvironmentMapIntensity(float intensity) { environmentMapData_->intensity = intensity; }
+    void SetDissolveEnabled(bool isEnabled) { dissolveData_->enableDissolve = isEnabled ? 1 : 0; }
+    void SetDissolveThreshold(float threshold) { dissolveData_->threshold = threshold; }
+    void SetDissolveEdgeWidth(float edgeWidth) { dissolveData_->edgeWidth = edgeWidth; }
+    void SetDissolveEdgeGlowStrength(float edgeGlowStrength) { dissolveData_->edgeGlowStrength = edgeGlowStrength; }
+    void SetDissolveEdgeColor(const Vector4& edgeColor) { dissolveData_->edgeColor = edgeColor; }
+    void SetDissolveMaskTextureIndex(uint32_t textureIndex) { dissolveMaskTextureIndex_ = textureIndex; }
+    void SetDissolveMaskTexture(const std::string& path);
 
     void SetScale(const Vector3& scale) { transform_.scale = scale; }
     void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
@@ -51,6 +67,7 @@ private:
     void CreateTransformationMatrixResource();
     void CreateDirectionalLightResource();
     void CreateEnvironmentMapResource();
+    void CreateDissolveResource();
 
 private:
     Object3dCommon* object3dCommon_ = nullptr;
@@ -68,4 +85,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Resource> environmentMapResource_;
     EnvironmentMapData* environmentMapData_ = nullptr;
     uint32_t environmentTextureIndex_ = static_cast<uint32_t>(-1);
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> dissolveResource_;
+    DissolveData* dissolveData_ = nullptr;
+    uint32_t dissolveMaskTextureIndex_ = static_cast<uint32_t>(-1);
 };

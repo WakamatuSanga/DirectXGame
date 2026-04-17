@@ -31,7 +31,7 @@ void Object3dCommon::CreateRootSignature()
     staticSamplers[0].ShaderRegister = 0;
     staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    D3D12_ROOT_PARAMETER rootParameters[6]{};
+    D3D12_ROOT_PARAMETER rootParameters[8]{};
 
     // [0] Pixel CBV : Material(b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -44,7 +44,7 @@ void Object3dCommon::CreateRootSignature()
     rootParameters[1].Descriptor.ShaderRegister = 0;
 
     // [2] Pixel SRV : Texture(t0)
-    D3D12_DESCRIPTOR_RANGE descriptorRange[2]{};
+    D3D12_DESCRIPTOR_RANGE descriptorRange[3]{};
     descriptorRange[0].BaseShaderRegister = 0;
     descriptorRange[0].NumDescriptors = 1;
     descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -73,6 +73,21 @@ void Object3dCommon::CreateRootSignature()
     rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[5].DescriptorTable.pDescriptorRanges = &descriptorRange[1];
     rootParameters[5].DescriptorTable.NumDescriptorRanges = 1;
+
+    // [6] Pixel CBV : DissolveData(b3)
+    rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[6].Descriptor.ShaderRegister = 3;
+
+    // [7] Pixel SRV : DissolveMaskTexture(t2)
+    descriptorRange[2].BaseShaderRegister = 2;
+    descriptorRange[2].NumDescriptors = 1;
+    descriptorRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    rootParameters[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[7].DescriptorTable.pDescriptorRanges = &descriptorRange[2];
+    rootParameters[7].DescriptorTable.NumDescriptorRanges = 1;
 
     descriptionRootSignature.pParameters = rootParameters;
     descriptionRootSignature.NumParameters = _countof(rootParameters);

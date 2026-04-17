@@ -22,6 +22,14 @@ namespace {
         uint32_t sampleCount;
     };
 
+    struct DissolvePreset {
+        const char* name;
+        uint32_t enabled;
+        float threshold;
+        float edgeWidth;
+        std::array<float, 4> edgeColor;
+    };
+
     struct OutlinePreset {
         const char* name;
         uint32_t outlineMode;
@@ -56,6 +64,13 @@ namespace {
         { "Medium", 1u, 0.020f, { 0.5f, 0.5f }, 8u },
         { "Strong", 1u, 0.040f, { 0.5f, 0.5f }, 12u },
         { "Dramatic", 1u, 0.060f, { 0.5f, 0.5f }, 16u },
+    };
+
+    constexpr DissolvePreset kDissolvePresets[] = {
+        { "Weak", 1u, 0.20f, 0.02f, { 1.0f, 0.6f, 0.2f, 1.0f } },
+        { "Medium", 1u, 0.45f, 0.04f, { 1.0f, 0.5f, 0.1f, 1.0f } },
+        { "Strong", 1u, 0.65f, 0.06f, { 1.0f, 0.4f, 0.0f, 1.0f } },
+        { "Dramatic", 1u, 0.82f, 0.08f, { 0.4f, 0.9f, 1.0f, 1.0f } },
     };
 }
 
@@ -100,6 +115,17 @@ void GameScene::Initialize() {
     object3dSphere_->SetEnvironmentTextureIndex(skyboxTextureIndex_);
     object3dSphere_->SetEnvironmentMapEnabled(isSphereEnvironmentMapEnabled_);
     object3dSphere_->SetEnvironmentMapIntensity(sphereEnvironmentMapIntensity_);
+    object3dSphere_->SetDissolveEnabled(isObjectDissolveEnabled_);
+    object3dSphere_->SetDissolveThreshold(objectDissolveThreshold_);
+    object3dSphere_->SetDissolveEdgeWidth(objectDissolveEdgeWidth_);
+    object3dSphere_->SetDissolveEdgeGlowStrength(objectDissolveEdgeGlowStrength_);
+    object3dSphere_->SetDissolveEdgeColor({
+        objectDissolveEdgeColor_[0],
+        objectDissolveEdgeColor_[1],
+        objectDissolveEdgeColor_[2],
+        objectDissolveEdgeColor_[3]
+        });
+    object3dSphere_->SetDissolveMaskTexture(objectDissolveMaskTexturePath_);
 
     texManager->LoadTexture("resources/obj/axis/uvChecker.png");
     texManager->LoadTexture("resources/obj/fence/fence.png");
@@ -157,7 +183,8 @@ void GameScene::Finalize() {}
 void GameScene::Update() {
     auto input = MyGame::GetInstance()->GetInput();
     auto particleManager = ParticleManager::GetInstance();
-    auto& postEffectParams = MyGame::GetInstance()->GetDxCommon()->GetPostEffectParameters();
+    auto dxCommon = MyGame::GetInstance()->GetDxCommon();
+    auto& postEffectParams = dxCommon->GetPostEffectParameters();
     auto& hitEffectParams = particleManager->GetHitEffectParams();
     auto& fireballEffectParams = particleManager->GetFireballEffectParams();
     auto& windEffectParams = particleManager->GetWindEffectParams();
@@ -207,6 +234,16 @@ void GameScene::Update() {
     skybox_->Update();
     object3dSphere_->SetEnvironmentMapEnabled(isSphereEnvironmentMapEnabled_);
     object3dSphere_->SetEnvironmentMapIntensity(sphereEnvironmentMapIntensity_);
+    object3dSphere_->SetDissolveEnabled(isObjectDissolveEnabled_);
+    object3dSphere_->SetDissolveThreshold(objectDissolveThreshold_);
+    object3dSphere_->SetDissolveEdgeWidth(objectDissolveEdgeWidth_);
+    object3dSphere_->SetDissolveEdgeGlowStrength(objectDissolveEdgeGlowStrength_);
+    object3dSphere_->SetDissolveEdgeColor({
+        objectDissolveEdgeColor_[0],
+        objectDissolveEdgeColor_[1],
+        objectDissolveEdgeColor_[2],
+        objectDissolveEdgeColor_[3]
+        });
     object3d_->Update();
     object3dSphere_->Update();
     for (auto& primitivePreviewObject : primitivePreviewObjects_) {
@@ -286,6 +323,24 @@ void GameScene::Update() {
     ImGui::TextWrapped("Cubemap DDS: %s", skyboxTexturePath_.c_str());
     ImGui::Text("Cubemap TextureIndex: %u", skyboxTextureIndex_);
 
+    ImGui::SeparatorText("Object Dissolve");
+    ImGui::TextWrapped("Applies only to the sphere object for assignment verification.");
+    ImGui::Checkbox("Enable Object Dissolve", &isObjectDissolveEnabled_);
+    ImGui::SliderFloat("Object Dissolve Threshold", &objectDissolveThreshold_, 0.0f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Object Dissolve Edge Width", &objectDissolveEdgeWidth_, 0.001f, 0.2f, "%.3f");
+    ImGui::SliderFloat("Object Dissolve Edge Glow", &objectDissolveEdgeGlowStrength_, 0.0f, 4.0f, "%.2f");
+    ImGui::ColorEdit4("Object Dissolve Edge Color", objectDissolveEdgeColor_.data());
+    const char* objectDissolveMaskTextureNames[] = { "noise0", "noise1" };
+    const char* objectDissolveMaskTexturePaths[] = {
+        "resources/postEffect/noise0.png",
+        "resources/postEffect/noise1.png"
+    };
+    if (ImGui::Combo("Object Dissolve Mask", &currentObjectDissolveMaskTexture_, objectDissolveMaskTextureNames, IM_ARRAYSIZE(objectDissolveMaskTextureNames))) {
+        objectDissolveMaskTexturePath_ = objectDissolveMaskTexturePaths[currentObjectDissolveMaskTexture_];
+        object3dSphere_->SetDissolveMaskTexture(objectDissolveMaskTexturePath_);
+    }
+    ImGui::TextWrapped("Mask Path: %s", objectDissolveMaskTexturePath_.c_str());
+
     ImGui::SeparatorText("Post Effects");
     auto DrawPostEffectUI = [](const char* label, uint32_t& enabled, float& intensity) {
         bool isEnabled = enabled != 0;
@@ -300,6 +355,12 @@ void GameScene::Update() {
         postEffectParams.radialBlurStrength = preset.strength;
         postEffectParams.radialBlurCenter = preset.center;
         postEffectParams.radialBlurSampleCount = preset.sampleCount;
+    };
+    auto ApplyDissolvePreset = [&](const DissolvePreset& preset) {
+        postEffectParams.dissolveEnabled = preset.enabled;
+        postEffectParams.dissolveThreshold = preset.threshold;
+        postEffectParams.dissolveEdgeWidth = preset.edgeWidth;
+        postEffectParams.dissolveEdgeColor = preset.edgeColor;
     };
     auto ApplyOutlinePreset = [&](const OutlinePreset& preset) {
         postEffectParams.outlineMode = preset.outlineMode;
@@ -337,6 +398,28 @@ void GameScene::Update() {
     if (ImGui::SliderInt("RadialBlur Sample Count", &radialBlurSampleCount, 1, 32)) {
         postEffectParams.radialBlurSampleCount = static_cast<uint32_t>(radialBlurSampleCount);
     }
+    const char* dissolveNoiseTextureNames[] = { "noise0", "noise1" };
+    const char* dissolveNoiseTexturePaths[] = {
+        "resources/postEffect/noise0.png",
+        "resources/postEffect/noise1.png"
+    };
+    if (ImGui::Combo("Dissolve Noise Texture", &currentDissolveNoiseTexture_, dissolveNoiseTextureNames, IM_ARRAYSIZE(dissolveNoiseTextureNames))) {
+        texManager->LoadTexture(dissolveNoiseTexturePaths[currentDissolveNoiseTexture_]);
+        dxCommon->SetDissolveNoiseTextureIndex(
+            texManager->GetTextureIndexByFilePath(dissolveNoiseTexturePaths[currentDissolveNoiseTexture_]));
+    }
+    bool dissolveEnabled = postEffectParams.dissolveEnabled != 0;
+    if (ImGui::Checkbox("Dissolve", &dissolveEnabled)) {
+        postEffectParams.dissolveEnabled = dissolveEnabled ? 1u : 0u;
+    }
+    static int dissolvePresetIndex = 1;
+    const char* dissolvePresetNames[] = { "Weak", "Medium", "Strong", "Dramatic" };
+    if (ImGui::Combo("Dissolve Preset", &dissolvePresetIndex, dissolvePresetNames, IM_ARRAYSIZE(dissolvePresetNames))) {
+        ApplyDissolvePreset(kDissolvePresets[dissolvePresetIndex]);
+    }
+    ImGui::SliderFloat("Dissolve Threshold", &postEffectParams.dissolveThreshold, 0.0f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Dissolve Edge Width", &postEffectParams.dissolveEdgeWidth, 0.001f, 0.2f, "%.3f");
+    ImGui::ColorEdit4("Dissolve Edge Color", postEffectParams.dissolveEdgeColor.data());
     bool outlineEnabled = postEffectParams.outlineMode != 0;
     if (ImGui::Checkbox("Outline", &outlineEnabled)) {
         if (!outlineEnabled) {

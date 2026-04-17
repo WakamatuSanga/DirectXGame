@@ -119,6 +119,7 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
     assert(renderTextureResource_);
     assert(normalTextureResource_);
     assert(depthBuffer);
+    assert(dissolveNoiseTextureSRVHandleGPU_.ptr != 0);
     assert(copyRootSignature_);
     assert(copyPipelineState_);
     assert(postEffectResource_);
@@ -148,7 +149,8 @@ void DirectXCommon::CopyRenderTextureToSwapChain()
         commandList->SetGraphicsRootDescriptorTable(0, sourceSRV);
         commandList->SetGraphicsRootDescriptorTable(1, depthTextureSRVHandleGPU_);
         commandList->SetGraphicsRootDescriptorTable(2, normalTextureSRVHandleGPU_);
-        commandList->SetGraphicsRootConstantBufferView(3, postEffectResource_->GetGPUVirtualAddress());
+        commandList->SetGraphicsRootDescriptorTable(3, dissolveNoiseTextureSRVHandleGPU_);
+        commandList->SetGraphicsRootConstantBufferView(4, postEffectResource_->GetGPUVirtualAddress());
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
         };
@@ -331,7 +333,7 @@ void DirectXCommon::CreateCopyRootSignature()
 {
     HRESULT hr = S_OK;
 
-    D3D12_DESCRIPTOR_RANGE descriptorRanges[3]{};
+    D3D12_DESCRIPTOR_RANGE descriptorRanges[4]{};
     descriptorRanges[0].BaseShaderRegister = 0;
     descriptorRanges[0].NumDescriptors = 1;
     descriptorRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -347,7 +349,12 @@ void DirectXCommon::CreateCopyRootSignature()
     descriptorRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRanges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootParameters[4]{};
+    descriptorRanges[3].BaseShaderRegister = 3;
+    descriptorRanges[3].NumDescriptors = 1;
+    descriptorRanges[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRanges[3].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    D3D12_ROOT_PARAMETER rootParameters[5]{};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRanges[0];
@@ -363,10 +370,15 @@ void DirectXCommon::CreateCopyRootSignature()
     rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRanges[2];
     rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
 
-    rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameters[3].Descriptor.ShaderRegister = 0;
-    rootParameters[3].Descriptor.RegisterSpace = 0;
+    rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRanges[3];
+    rootParameters[3].DescriptorTable.NumDescriptorRanges = 1;
+
+    rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[4].Descriptor.ShaderRegister = 0;
+    rootParameters[4].Descriptor.RegisterSpace = 0;
 
     D3D12_STATIC_SAMPLER_DESC staticSampler{};
     staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -548,6 +560,13 @@ void DirectXCommon::CreateRenderTexture(SrvManager* srvManager)
 }
 
 // FPS固定 初期化
+void DirectXCommon::SetDissolveNoiseTextureIndex(uint32_t textureIndex)
+{
+    dissolveNoiseTextureSRVIndex_ = textureIndex;
+    dissolveNoiseTextureSRVHandleCPU_ = GetSRVCPUDescriptorHandle(textureIndex);
+    dissolveNoiseTextureSRVHandleGPU_ = GetSRVGPUDescriptorHandle(textureIndex);
+}
+
 void DirectXCommon::InitializeFixFPS() {
     // 現在時間を記録する
     reference_ = std::chrono::steady_clock::now();

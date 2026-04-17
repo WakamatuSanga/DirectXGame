@@ -22,6 +22,9 @@ struct PostEffectParameters
     float radialBlurStrength;
     float2 radialBlurCenter;
     uint radialBlurSampleCount;
+    uint dissolveEnabled;
+    float dissolveThreshold;
+    float dissolveEdgeWidth;
     uint outlineMode;
     float outlineIntensity;
     float outlineThickness;
@@ -37,5 +40,7 @@ struct PostEffectParameters
     float hybridNormalWeight;
     float depthNear;
     float depthFar;
+    float postEffectPadding;
+    float4 dissolveEdgeColor;
     float4 outlineColor;
 };
