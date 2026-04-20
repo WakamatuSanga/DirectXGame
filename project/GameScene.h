@@ -53,7 +53,12 @@ private:
     float objectDissolveThreshold_ = 0.0f;
     float objectDissolveEdgeWidth_ = 0.05f;
     float objectDissolveEdgeGlowStrength_ = 0.5f;
+    float objectDissolveEdgeNoiseStrength_ = 0.25f;
     std::array<float, 4> objectDissolveEdgeColor_ = { 1.0f, 0.5f, 0.1f, 1.0f };
+    bool isObjectRandomEnabled_ = false;
+    bool isObjectRandomPreview_ = true;
+    float objectRandomIntensity_ = 1.0f;
+    float objectRandomTime_ = 0.0f;
     bool isPrimitivePreviewVisible_ = true;
 
     float layoutStartX_ = -1.4f;

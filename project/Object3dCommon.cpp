@@ -31,7 +31,7 @@ void Object3dCommon::CreateRootSignature()
     staticSamplers[0].ShaderRegister = 0;
     staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    D3D12_ROOT_PARAMETER rootParameters[8]{};
+    D3D12_ROOT_PARAMETER rootParameters[9]{};
 
     // [0] Pixel CBV : Material(b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -88,6 +88,11 @@ void Object3dCommon::CreateRootSignature()
     rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[7].DescriptorTable.pDescriptorRanges = &descriptorRange[2];
     rootParameters[7].DescriptorTable.NumDescriptorRanges = 1;
+
+    // [8] Pixel CBV : RandomNoiseData(b4)
+    rootParameters[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[8].Descriptor.ShaderRegister = 4;
 
     descriptionRootSignature.pParameters = rootParameters;
     descriptionRootSignature.NumParameters = _countof(rootParameters);

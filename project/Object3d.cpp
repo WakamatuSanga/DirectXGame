@@ -15,6 +15,7 @@ void Object3d::Initialize(Object3dCommon* object3dCommon) {
     CreateDirectionalLightResource();
     CreateEnvironmentMapResource();
     CreateDissolveResource();
+    CreateRandomNoiseResource();
 }
 
 void Object3d::Update() {
@@ -46,6 +47,7 @@ void Object3d::Draw() {
     commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(4, environmentMapResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(6, dissolveResource_->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(8, randomNoiseResource_->GetGPUVirtualAddress());
 
     if (environmentTextureIndex_ != static_cast<uint32_t>(-1)) {
         commandList->SetGraphicsRootDescriptorTable(5, TextureManager::GetInstance()->GetSrvHandleGPU(environmentTextureIndex_));
@@ -100,6 +102,20 @@ void Object3d::CreateDissolveResource()
     dissolveData_->threshold = 0.0f;
     dissolveData_->edgeWidth = 0.05f;
     dissolveData_->edgeGlowStrength = 0.5f;
+    dissolveData_->edgeNoiseStrength = 0.25f;
+    dissolveData_->padding[0] = 0.0f;
+    dissolveData_->padding[1] = 0.0f;
+    dissolveData_->padding[2] = 0.0f;
     dissolveData_->edgeColor = { 1.0f, 0.5f, 0.1f, 1.0f };
     SetDissolveMaskTexture("resources/postEffect/noise0.png");
+}
+
+void Object3d::CreateRandomNoiseResource()
+{
+    randomNoiseResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(RandomNoiseData));
+    randomNoiseResource_->Map(0, nullptr, reinterpret_cast<void**>(&randomNoiseData_));
+    randomNoiseData_->enableRandom = 0;
+    randomNoiseData_->previewRandom = 0;
+    randomNoiseData_->intensity = 1.0f;
+    randomNoiseData_->time = 0.0f;
 }

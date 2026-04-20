@@ -20,7 +20,16 @@ class Object3d {
         float threshold;
         float edgeWidth;
         float edgeGlowStrength;
+        float edgeNoiseStrength;
+        float padding[3];
         Vector4 edgeColor;
+    };
+
+    struct RandomNoiseData {
+        int32_t enableRandom;
+        int32_t previewRandom;
+        float intensity;
+        float time;
     };
 
 public:
@@ -52,9 +61,14 @@ public:
     void SetDissolveThreshold(float threshold) { dissolveData_->threshold = threshold; }
     void SetDissolveEdgeWidth(float edgeWidth) { dissolveData_->edgeWidth = edgeWidth; }
     void SetDissolveEdgeGlowStrength(float edgeGlowStrength) { dissolveData_->edgeGlowStrength = edgeGlowStrength; }
+    void SetDissolveEdgeNoiseStrength(float edgeNoiseStrength) { dissolveData_->edgeNoiseStrength = edgeNoiseStrength; }
     void SetDissolveEdgeColor(const Vector4& edgeColor) { dissolveData_->edgeColor = edgeColor; }
     void SetDissolveMaskTextureIndex(uint32_t textureIndex) { dissolveMaskTextureIndex_ = textureIndex; }
     void SetDissolveMaskTexture(const std::string& path);
+    void SetRandomEnabled(bool isEnabled) { randomNoiseData_->enableRandom = isEnabled ? 1 : 0; }
+    void SetRandomPreview(bool isPreview) { randomNoiseData_->previewRandom = isPreview ? 1 : 0; }
+    void SetRandomIntensity(float intensity) { randomNoiseData_->intensity = intensity; }
+    void SetRandomTime(float time) { randomNoiseData_->time = time; }
 
     void SetScale(const Vector3& scale) { transform_.scale = scale; }
     void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
@@ -68,6 +82,7 @@ private:
     void CreateDirectionalLightResource();
     void CreateEnvironmentMapResource();
     void CreateDissolveResource();
+    void CreateRandomNoiseResource();
 
 private:
     Object3dCommon* object3dCommon_ = nullptr;
@@ -89,4 +104,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Resource> dissolveResource_;
     DissolveData* dissolveData_ = nullptr;
     uint32_t dissolveMaskTextureIndex_ = static_cast<uint32_t>(-1);
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> randomNoiseResource_;
+    RandomNoiseData* randomNoiseData_ = nullptr;
 };
