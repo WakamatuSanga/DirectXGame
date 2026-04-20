@@ -27,13 +27,24 @@ struct DissolveData
     float threshold;
     float edgeWidth;
     float edgeGlowStrength;
+    float edgeNoiseStrength;
+    float3 padding;
     float4 edgeColor;
+};
+
+struct RandomNoiseData
+{
+    int enableRandom;
+    int previewRandom;
+    float intensity;
+    float time;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<EnvironmentMapData> gEnvironmentMapData : register(b2);
 ConstantBuffer<DissolveData> gDissolveData : register(b3);
+ConstantBuffer<RandomNoiseData> gRandomNoiseData : register(b4);
 
 Texture2D<float4> gTexture : register(t0);
 TextureCube<float4> gEnvironmentTexture : register(t1);
@@ -53,6 +64,11 @@ struct PixelShaderOutput
     float4 color : SV_TARGET0;
     float4 normal : SV_TARGET1;
 };
+
+float rand2dTo1d(float2 value)
+{
+    return frac(sin(dot(value, float2(12.9898f, 78.233f))) * 43758.5453f);
+}
 
 PixelShaderOutput main(VertexShaderOutput input)
 {
@@ -109,8 +125,28 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     if (gDissolveData.enableDissolve != 0)
     {
-        outputColor.rgb = lerp(outputColor.rgb, gDissolveData.edgeColor.rgb, saturate(dissolveEdge * gDissolveData.edgeColor.a));
-        outputColor.rgb += gDissolveData.edgeColor.rgb * dissolveEdge * gDissolveData.edgeGlowStrength;
+        float edgeNoise = rand2dTo1d(transformedUV.xy * 32.0f + gRandomNoiseData.time.xx);
+        float edgeVariation = lerp(
+            1.0f - gDissolveData.edgeNoiseStrength,
+            1.0f + gDissolveData.edgeNoiseStrength,
+            edgeNoise);
+        float edgeGlow = dissolveEdge * edgeVariation;
+        outputColor.rgb = lerp(outputColor.rgb, gDissolveData.edgeColor.rgb, saturate(edgeGlow * gDissolveData.edgeColor.a));
+        outputColor.rgb += gDissolveData.edgeColor.rgb * edgeGlow * gDissolveData.edgeGlowStrength;
+    }
+
+    if (gRandomNoiseData.enableRandom != 0)
+    {
+        float random = rand2dTo1d(transformedUV.xy * 32.0f + gRandomNoiseData.time.xx);
+        if (gRandomNoiseData.previewRandom != 0)
+        {
+            outputColor.rgb = random.xxx;
+        }
+        else
+        {
+            float noiseFactor = lerp(1.0f, random, saturate(gRandomNoiseData.intensity));
+            outputColor.rgb *= noiseFactor;
+        }
     }
 
     PixelShaderOutput output;

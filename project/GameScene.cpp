@@ -119,6 +119,7 @@ void GameScene::Initialize() {
     object3dSphere_->SetDissolveThreshold(objectDissolveThreshold_);
     object3dSphere_->SetDissolveEdgeWidth(objectDissolveEdgeWidth_);
     object3dSphere_->SetDissolveEdgeGlowStrength(objectDissolveEdgeGlowStrength_);
+    object3dSphere_->SetDissolveEdgeNoiseStrength(objectDissolveEdgeNoiseStrength_);
     object3dSphere_->SetDissolveEdgeColor({
         objectDissolveEdgeColor_[0],
         objectDissolveEdgeColor_[1],
@@ -126,6 +127,10 @@ void GameScene::Initialize() {
         objectDissolveEdgeColor_[3]
         });
     object3dSphere_->SetDissolveMaskTexture(objectDissolveMaskTexturePath_);
+    object3dSphere_->SetRandomEnabled(isObjectRandomEnabled_);
+    object3dSphere_->SetRandomPreview(isObjectRandomPreview_);
+    object3dSphere_->SetRandomIntensity(objectRandomIntensity_);
+    object3dSphere_->SetRandomTime(objectRandomTime_);
 
     texManager->LoadTexture("resources/obj/axis/uvChecker.png");
     texManager->LoadTexture("resources/obj/fence/fence.png");
@@ -225,6 +230,7 @@ void GameScene::Update() {
     if (input->PushKey(DIK_0)) audio->PlayAudio("resources/sounds/Alarm01.mp3");
 
     camera_->Update();
+    objectRandomTime_ += 0.016f;
     if (isSkyboxFollowCamera_) {
         skyboxTranslate_ = camera_->GetTranslate();
     }
@@ -238,12 +244,17 @@ void GameScene::Update() {
     object3dSphere_->SetDissolveThreshold(objectDissolveThreshold_);
     object3dSphere_->SetDissolveEdgeWidth(objectDissolveEdgeWidth_);
     object3dSphere_->SetDissolveEdgeGlowStrength(objectDissolveEdgeGlowStrength_);
+    object3dSphere_->SetDissolveEdgeNoiseStrength(objectDissolveEdgeNoiseStrength_);
     object3dSphere_->SetDissolveEdgeColor({
         objectDissolveEdgeColor_[0],
         objectDissolveEdgeColor_[1],
         objectDissolveEdgeColor_[2],
         objectDissolveEdgeColor_[3]
         });
+    object3dSphere_->SetRandomEnabled(isObjectRandomEnabled_);
+    object3dSphere_->SetRandomPreview(isObjectRandomPreview_);
+    object3dSphere_->SetRandomIntensity(objectRandomIntensity_);
+    object3dSphere_->SetRandomTime(objectRandomTime_);
     object3d_->Update();
     object3dSphere_->Update();
     for (auto& primitivePreviewObject : primitivePreviewObjects_) {
@@ -329,6 +340,7 @@ void GameScene::Update() {
     ImGui::SliderFloat("Object Dissolve Threshold", &objectDissolveThreshold_, 0.0f, 1.0f, "%.3f");
     ImGui::SliderFloat("Object Dissolve Edge Width", &objectDissolveEdgeWidth_, 0.001f, 0.2f, "%.3f");
     ImGui::SliderFloat("Object Dissolve Edge Glow", &objectDissolveEdgeGlowStrength_, 0.0f, 4.0f, "%.2f");
+    ImGui::SliderFloat("Object Dissolve Edge Noise", &objectDissolveEdgeNoiseStrength_, 0.0f, 1.0f, "%.2f");
     ImGui::ColorEdit4("Object Dissolve Edge Color", objectDissolveEdgeColor_.data());
     const char* objectDissolveMaskTextureNames[] = { "noise0", "noise1" };
     const char* objectDissolveMaskTexturePaths[] = {
@@ -340,6 +352,13 @@ void GameScene::Update() {
         object3dSphere_->SetDissolveMaskTexture(objectDissolveMaskTexturePath_);
     }
     ImGui::TextWrapped("Mask Path: %s", objectDissolveMaskTexturePath_.c_str());
+
+    ImGui::SeparatorText("Object Random Noise");
+    ImGui::TextWrapped("Applies only to the sphere object for shader random verification.");
+    ImGui::Checkbox("Enable Object Random", &isObjectRandomEnabled_);
+    ImGui::Checkbox("Preview Object Random", &isObjectRandomPreview_);
+    ImGui::SliderFloat("Object Random Intensity", &objectRandomIntensity_, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Object Random Time", &objectRandomTime_, 0.0f, 100.0f, "%.2f");
 
     ImGui::SeparatorText("Post Effects");
     auto DrawPostEffectUI = [](const char* label, uint32_t& enabled, float& intensity) {
