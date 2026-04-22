@@ -22,11 +22,14 @@ private:
     std::unique_ptr<Skybox> skybox_;
     std::unique_ptr<Object3d> object3d_;       // フェンス用
     std::unique_ptr<Object3d> object3dSphere_; // 球用
+    std::unique_ptr<Object3d> ringEffectPlane_;
+    std::unique_ptr<Object3d> ringEffect_;
     std::unique_ptr<Sprite> debugSprite_;
     std::vector<std::unique_ptr<Object3d>> primitivePreviewObjects_;
 
     Model* modelFence_ = nullptr;
     Model* modelSphere_ = nullptr;
+    Model* ringEffectModel_ = nullptr;
 
     uint32_t texIndexUvChecker_ = 0;
     uint32_t texIndexFence_ = 0;
@@ -60,6 +63,45 @@ private:
     float objectRandomIntensity_ = 1.0f;
     float objectRandomTime_ = 0.0f;
     bool isPrimitivePreviewVisible_ = true;
+    bool isRingEffectVisible_ = true;
+    bool isRingEffectPlaneVisible_ = true;
+    bool isRingBillboardEnabled_ = true;
+    Vector3 ringEffectTranslate_ = { 0.0f, 1.2f, 3.0f };
+    Vector3 ringEffectRotate_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 ringEffectScale_ = { 1.6f, 1.6f, 1.0f };
+    float ringEffectPlaneScale_ = 1.35f;
+    bool isRingAppearancePreviewEnabled_ = false;
+    int currentRingUVDirection_ = 0;
+    std::array<float, 4> ringInnerColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+    std::array<float, 4> ringOuterColor_ = { 1.0f, 0.6f, 0.2f, 1.0f };
+    float ringStartAlpha_ = 1.0f;
+    float ringEndAlpha_ = 1.0f;
+    float ringStartFadeRange_ = 0.15f;
+    float ringEndFadeRange_ = 0.15f;
+    float ringShapeStartAngle_ = 0.0f;
+    float ringShapeEndAngle_ = 360.0f;
+    float ringShapeStartRadius_ = 1.0f;
+    float ringShapeEndRadius_ = 1.0f;
+    bool isRingEffectModelDirty_ = false;
+    bool isRingAnimationEnabled_ = false;
+    bool isRingUVScrollEnabled_ = false;
+    float ringAnimationTime_ = 0.0f;
+    float ringUVScrollSpeedX_ = 0.25f;
+    float ringUVScrollSpeedY_ = 0.0f;
+    bool isRingAlphaAnimationEnabled_ = false;
+    float ringAlphaAnimationSpeed_ = 1.5f;
+    float ringAlphaAnimationMin_ = 0.15f;
+    float ringAlphaAnimationMax_ = 1.0f;
+    bool isRingRadiusAnimationEnabled_ = false;
+    float ringRadiusAnimationSpeed_ = 1.25f;
+    float ringRadiusAnimationStartMin_ = 0.8f;
+    float ringRadiusAnimationStartMax_ = 1.2f;
+    float ringRadiusAnimationEndMin_ = 0.8f;
+    float ringRadiusAnimationEndMax_ = 1.2f;
+    bool isRingAngleAnimationEnabled_ = false;
+    float ringAngleAnimationSpeed_ = 1.0f;
+    float ringAngleAnimationSpan_ = 180.0f;
+    float ringAngleAnimationBase_ = 0.0f;
 
     float layoutStartX_ = -1.4f;
     float layoutStartY_ = -0.8f;

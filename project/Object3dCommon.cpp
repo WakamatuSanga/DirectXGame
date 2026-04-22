@@ -24,14 +24,14 @@ void Object3dCommon::CreateRootSignature()
     D3D12_STATIC_SAMPLER_DESC staticSamplers[1]{};
     staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     staticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
     staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
     staticSamplers[0].ShaderRegister = 0;
     staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    D3D12_ROOT_PARAMETER rootParameters[9]{};
+    D3D12_ROOT_PARAMETER rootParameters[10]{};
 
     // [0] Pixel CBV : Material(b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -93,6 +93,11 @@ void Object3dCommon::CreateRootSignature()
     rootParameters[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[8].Descriptor.ShaderRegister = 4;
+
+    // [9] Pixel CBV : RingAppearanceData(b5)
+    rootParameters[9].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[9].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[9].Descriptor.ShaderRegister = 5;
 
     descriptionRootSignature.pParameters = rootParameters;
     descriptionRootSignature.NumParameters = _countof(rootParameters);

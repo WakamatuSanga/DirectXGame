@@ -6,14 +6,30 @@
 #include "ModelManager.h"
 #include "ParticleManager.h"
 #include "Audio.h"
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <numbers>
 
 #ifdef _DEBUG
 #include "externals/imgui/imgui.h"
 #endif
 
 namespace {
+    constexpr float kRingInnerRadius = 0.45f;
+    constexpr float kRingOuterRadius = 1.0f;
+    constexpr uint32_t kRingSubdivision = 32u;
+
+    float WrapDegrees(float degrees) {
+        while (degrees < 0.0f) {
+            degrees += 360.0f;
+        }
+        while (degrees >= 360.0f) {
+            degrees -= 360.0f;
+        }
+        return degrees;
+    }
+
     struct RadialBlurPreset {
         const char* name;
         uint32_t enabled;
@@ -136,6 +152,7 @@ void GameScene::Initialize() {
     texManager->LoadTexture("resources/obj/fence/fence.png");
     texManager->LoadTexture("resources/obj/monsterBall/monsterBall.png");
     texManager->LoadTexture("resources/particle/circle2.png");
+    texManager->LoadTexture("resources/particle/gradationLine.png");
 
     texIndexUvChecker_ = texManager->GetTextureIndexByFilePath("resources/obj/axis/uvChecker.png");
     texIndexFence_ = texManager->GetTextureIndexByFilePath("resources/obj/fence/fence.png");
@@ -167,12 +184,53 @@ void GameScene::Initialize() {
 
     createPrimitivePreview(modelManager->CreatePlane("PrimitivePlane"), { -4.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.4f, 1.4f, 1.4f });
     createPrimitivePreview(modelManager->CreateCircle("PrimitiveCircle", 32), { -1.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.2f, 1.2f, 1.2f });
-    createPrimitivePreview(modelManager->CreateRing("PrimitiveRing", 32, 0.45f, 1.0f), { 1.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.2f, 1.2f, 1.2f });
+    Model* primitiveRingModel = modelManager->CreateRing("PrimitiveRing", 32, 0.45f, 1.0f);
+    if (primitiveRingModel) {
+        primitiveRingModel->SetTextureIndex(texManager->GetTextureIndexByFilePath("resources/particle/gradationLine.png"));
+    }
+    createPrimitivePreview(primitiveRingModel, { 1.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.5f, 1.5f, 1.5f });
     createPrimitivePreview(modelManager->CreateTriangle("PrimitiveTriangle"), { 4.5f, -1.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 1.4f, 1.4f, 1.4f });
     createPrimitivePreview(modelManager->CreateBox("PrimitiveBox"), { -4.5f, 0.9f, 6.0f }, { 0.35f, 0.45f, 0.0f }, { 0.9f, 0.9f, 0.9f });
     createPrimitivePreview(modelManager->CreateCylinder("PrimitiveCylinder", 32), { -1.5f, 0.9f, 6.0f }, { 0.1f, 0.35f, 0.0f }, { 0.85f, 0.85f, 0.85f });
     createPrimitivePreview(modelManager->CreateCone("PrimitiveCone", 32), { 1.5f, 0.9f, 6.0f }, { 0.1f, 0.35f, 0.0f }, { 0.85f, 0.85f, 0.85f });
     createPrimitivePreview(modelManager->CreateTorus("PrimitiveTorus", 32, 16), { 4.5f, 0.9f, 6.0f }, { 0.6f, 0.3f, 0.0f }, { 1.0f, 1.0f, 1.0f });
+
+    Model* ringEffectPlaneModel = modelManager->CreatePlane("RingEffectPlane");
+    if (ringEffectPlaneModel) {
+        ringEffectPlaneModel->SetTextureIndex(texManager->GetTextureIndexByFilePath("resources/particle/circle2.png"));
+        if (auto* material = ringEffectPlaneModel->GetMaterialData()) {
+            material->enableLighting = 0;
+        }
+    }
+
+    ringEffectModel_ = modelManager->CreateRing("RingEffectRing", 32, 0.45f, 1.0f);
+    if (ringEffectModel_) {
+        ringEffectModel_->SetTextureIndex(texManager->GetTextureIndexByFilePath("resources/particle/gradationLine.png"));
+        if (auto* material = ringEffectModel_->GetMaterialData()) {
+            material->enableLighting = 0;
+        }
+    }
+
+    ringEffectPlane_ = std::make_unique<Object3d>();
+    ringEffectPlane_->Initialize(object3dCommon);
+    ringEffectPlane_->SetModel(ringEffectPlaneModel);
+    ringEffectPlane_->SetCamera(camera_.get());
+    ringEffectPlane_->SetEnvironmentMapEnabled(false);
+
+    ringEffect_ = std::make_unique<Object3d>();
+    ringEffect_->Initialize(object3dCommon);
+    ringEffect_->SetModel(ringEffectModel_);
+    ringEffect_->SetCamera(camera_.get());
+    ringEffect_->SetEnvironmentMapEnabled(false);
+    ringEffect_->SetRingAppearanceEnabled(isRingAppearancePreviewEnabled_);
+    ringEffect_->SetRingUVDirection(currentRingUVDirection_);
+    ringEffect_->SetRingInnerRadiusRatio(0.45f);
+    ringEffect_->SetRingStartAlpha(ringStartAlpha_);
+    ringEffect_->SetRingEndAlpha(ringEndAlpha_);
+    ringEffect_->SetRingStartFadeRange(ringStartFadeRange_);
+    ringEffect_->SetRingEndFadeRange(ringEndFadeRange_);
+    ringEffect_->SetRingInnerColor({ ringInnerColor_[0], ringInnerColor_[1], ringInnerColor_[2], ringInnerColor_[3] });
+    ringEffect_->SetRingOuterColor({ ringOuterColor_[0], ringOuterColor_[1], ringOuterColor_[2], ringOuterColor_[3] });
 
     debugSprite_ = std::make_unique<Sprite>();
     debugSprite_->Initialize(spriteCommon);
@@ -189,6 +247,7 @@ void GameScene::Update() {
     auto input = MyGame::GetInstance()->GetInput();
     auto particleManager = ParticleManager::GetInstance();
     auto dxCommon = MyGame::GetInstance()->GetDxCommon();
+    auto modelManager = ModelManager::GetInstance();
     auto& postEffectParams = dxCommon->GetPostEffectParameters();
     auto& hitEffectParams = particleManager->GetHitEffectParams();
     auto& fireballEffectParams = particleManager->GetFireballEffectParams();
@@ -231,6 +290,61 @@ void GameScene::Update() {
 
     camera_->Update();
     objectRandomTime_ += 0.016f;
+    ringAnimationTime_ += 0.016f;
+
+    if (isRingAnimationEnabled_) {
+        if (isRingAlphaAnimationEnabled_) {
+            float alphaWave = (std::sin(ringAnimationTime_ * ringAlphaAnimationSpeed_) + 1.0f) * 0.5f;
+            float animatedAlpha = std::lerp(ringAlphaAnimationMin_, ringAlphaAnimationMax_, alphaWave);
+            ringStartAlpha_ = animatedAlpha;
+            ringEndAlpha_ = animatedAlpha;
+        }
+
+        if (isRingRadiusAnimationEnabled_) {
+            float startWave = (std::sin(ringAnimationTime_ * ringRadiusAnimationSpeed_) + 1.0f) * 0.5f;
+            float endWave = (std::sin(ringAnimationTime_ * ringRadiusAnimationSpeed_ + std::numbers::pi_v<float> * 0.5f) + 1.0f) * 0.5f;
+            ringShapeStartRadius_ = std::lerp(ringRadiusAnimationStartMin_, ringRadiusAnimationStartMax_, startWave);
+            ringShapeEndRadius_ = std::lerp(ringRadiusAnimationEndMin_, ringRadiusAnimationEndMax_, endWave);
+            isRingEffectModelDirty_ = true;
+        }
+
+        if (isRingAngleAnimationEnabled_) {
+            float span = std::clamp(ringAngleAnimationSpan_, 0.0f, 360.0f);
+            float maxStart = (std::max)(0.0f, 360.0f - span);
+            float animatedStart = WrapDegrees(ringAngleAnimationBase_ + ringAnimationTime_ * ringAngleAnimationSpeed_ * 60.0f);
+            if (maxStart > 0.0f) {
+                animatedStart = std::fmod(animatedStart, maxStart);
+            } else {
+                animatedStart = 0.0f;
+            }
+            ringShapeStartAngle_ = animatedStart;
+            ringShapeEndAngle_ = animatedStart + span;
+            isRingEffectModelDirty_ = true;
+        }
+    }
+
+    if (isRingEffectModelDirty_ && ringEffect_) {
+        float startAngleRadians = ringShapeStartAngle_ * std::numbers::pi_v<float> / 180.0f;
+        float endAngleRadians = ringShapeEndAngle_ * std::numbers::pi_v<float> / 180.0f;
+        ringEffectModel_ = modelManager->CreateRing(
+            "RingEffectRing",
+            kRingSubdivision,
+            kRingInnerRadius,
+            kRingOuterRadius,
+            startAngleRadians,
+            endAngleRadians,
+            ringShapeStartRadius_,
+            ringShapeEndRadius_);
+        if (ringEffectModel_) {
+            ringEffectModel_->SetTextureIndex(texManager->GetTextureIndexByFilePath("resources/particle/gradationLine.png"));
+            if (auto* material = ringEffectModel_->GetMaterialData()) {
+                material->enableLighting = 0;
+            }
+            ringEffect_->SetModel(ringEffectModel_);
+        }
+        isRingEffectModelDirty_ = false;
+    }
+
     if (isSkyboxFollowCamera_) {
         skyboxTranslate_ = camera_->GetTranslate();
     }
@@ -259,6 +373,58 @@ void GameScene::Update() {
     object3dSphere_->Update();
     for (auto& primitivePreviewObject : primitivePreviewObjects_) {
         primitivePreviewObject->Update();
+    }
+    if (ringEffect_) {
+        Vector3 effectRotation = ringEffectRotate_;
+        if (isRingBillboardEnabled_) {
+            Vector3 cameraRotation = camera_->GetRotate();
+            effectRotation.x += cameraRotation.x;
+            effectRotation.y += cameraRotation.y;
+            effectRotation.z += cameraRotation.z;
+        }
+
+        ringEffect_->SetTranslate(ringEffectTranslate_);
+        ringEffect_->SetRotate(effectRotation);
+        ringEffect_->SetScale(ringEffectScale_);
+        ringEffect_->SetRingAppearanceEnabled(isRingAppearancePreviewEnabled_);
+        ringEffect_->SetRingUVDirection(currentRingUVDirection_);
+        ringEffect_->SetRingInnerRadiusRatio(0.45f);
+        ringEffect_->SetRingStartAlpha(ringStartAlpha_);
+        ringEffect_->SetRingEndAlpha(ringEndAlpha_);
+        ringEffect_->SetRingStartFadeRange(ringStartFadeRange_);
+        ringEffect_->SetRingEndFadeRange(ringEndFadeRange_);
+        ringEffect_->SetRingInnerColor({ ringInnerColor_[0], ringInnerColor_[1], ringInnerColor_[2], ringInnerColor_[3] });
+        ringEffect_->SetRingOuterColor({ ringOuterColor_[0], ringOuterColor_[1], ringOuterColor_[2], ringOuterColor_[3] });
+        ringEffect_->Update();
+
+        if (ringEffectModel_) {
+            Matrix4x4 uvTransform = MatrixMath::MakeIdentity4x4();
+            if (isRingUVScrollEnabled_) {
+                uvTransform = MatrixMath::MakeAffine(
+                    { 1.0f, 1.0f, 1.0f },
+                    { 0.0f, 0.0f, 0.0f },
+                    { ringAnimationTime_ * ringUVScrollSpeedX_, ringAnimationTime_ * ringUVScrollSpeedY_, 0.0f });
+            }
+            if (auto* material = ringEffectModel_->GetMaterialData()) {
+                material->uvTransform = uvTransform;
+            }
+        }
+
+        if (ringEffectPlane_) {
+            Vector3 planeTranslate = ringEffectTranslate_;
+            planeTranslate.z += 0.01f;
+            Vector3 planeRotation = effectRotation;
+            planeRotation.x += std::numbers::pi_v<float> * 0.5f;
+
+            ringEffectPlane_->SetTranslate(planeTranslate);
+            ringEffectPlane_->SetRotate(planeRotation);
+            ringEffectPlane_->SetScale({
+                ringEffectScale_.x * ringEffectPlaneScale_,
+                ringEffectScale_.y * ringEffectPlaneScale_,
+                1.0f
+                });
+            ringEffectPlane_->Update();
+        }
     }
     debugSprite_->Update();
 
@@ -497,6 +663,58 @@ void GameScene::Update() {
     ImGui::Checkbox("Show Primitive Preview", &isPrimitivePreviewVisible_);
     ImGui::Text("Front Row : Plane / Circle / Ring / Triangle");
     ImGui::Text("Back Row  : Box / Cylinder / Cone / Torus");
+    ImGui::Text("Ring uses gradationLine.png (AddressV = CLAMP)");
+
+    ImGui::SeparatorText("Ring Effect Preview");
+    ImGui::Checkbox("Show Ring Effect", &isRingEffectVisible_);
+    ImGui::Checkbox("Show Effect Plane", &isRingEffectPlaneVisible_);
+    ImGui::Checkbox("Ring Billboard", &isRingBillboardEnabled_);
+    ImGui::Checkbox("Use Ring Appearance Extensions", &isRingAppearancePreviewEnabled_);
+    ImGui::DragFloat3("Ring Position", &ringEffectTranslate_.x, 0.1f);
+    ImGui::DragFloat3("Ring Rotation", &ringEffectRotate_.x, 0.01f);
+    ImGui::DragFloat3("Ring Scale", &ringEffectScale_.x, 0.05f, 0.1f, 10.0f);
+    ImGui::SliderFloat("Effect Plane Scale", &ringEffectPlaneScale_, 0.5f, 3.0f, "%.2f");
+    ImGui::Text("Ring : gradationLine.png");
+    ImGui::Text("Plane: circle2.png");
+    ImGui::Text("Billboard ON = particle-like usage check");
+    ImGui::Text("OFF = slide-like raw ring UV, ON = extended ring appearance");
+    const char* ringUVDirectionNames[] = { "Horizontal", "Vertical" };
+    ImGui::Combo("Ring UV Direction", &currentRingUVDirection_, ringUVDirectionNames, IM_ARRAYSIZE(ringUVDirectionNames));
+    ImGui::ColorEdit4("Ring Inner Color", ringInnerColor_.data());
+    ImGui::ColorEdit4("Ring Outer Color", ringOuterColor_.data());
+    ImGui::SliderFloat("Ring Start Alpha", &ringStartAlpha_, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Ring End Alpha", &ringEndAlpha_, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Ring Start Fade", &ringStartFadeRange_, 0.001f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Ring End Fade", &ringEndFadeRange_, 0.001f, 1.0f, "%.3f");
+    if (ImGui::SliderFloat("Ring Start Angle", &ringShapeStartAngle_, 0.0f, 360.0f, "%.1f")) {
+        isRingEffectModelDirty_ = true;
+    }
+    if (ImGui::SliderFloat("Ring End Angle", &ringShapeEndAngle_, 0.0f, 360.0f, "%.1f")) {
+        isRingEffectModelDirty_ = true;
+    }
+    if (ImGui::SliderFloat("Ring Start Radius", &ringShapeStartRadius_, 0.0f, 2.0f, "%.2f")) {
+        isRingEffectModelDirty_ = true;
+    }
+    if (ImGui::SliderFloat("Ring End Radius", &ringShapeEndRadius_, 0.0f, 2.0f, "%.2f")) {
+        isRingEffectModelDirty_ = true;
+    }
+    ImGui::Checkbox("Ring Animation", &isRingAnimationEnabled_);
+    ImGui::Checkbox("Ring UV Scroll", &isRingUVScrollEnabled_);
+    ImGui::SliderFloat2("Ring UV Scroll Speed", &ringUVScrollSpeedX_, -2.0f, 2.0f, "%.2f");
+    ImGui::Checkbox("Ring Alpha Animation", &isRingAlphaAnimationEnabled_);
+    ImGui::SliderFloat("Ring Alpha Speed", &ringAlphaAnimationSpeed_, 0.0f, 10.0f, "%.2f");
+    ImGui::SliderFloat("Ring Alpha Min", &ringAlphaAnimationMin_, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Ring Alpha Max", &ringAlphaAnimationMax_, 0.0f, 1.0f, "%.2f");
+    ImGui::Checkbox("Ring Radius Animation", &isRingRadiusAnimationEnabled_);
+    ImGui::SliderFloat("Ring Radius Speed", &ringRadiusAnimationSpeed_, 0.0f, 10.0f, "%.2f");
+    ImGui::SliderFloat("Ring Start Radius Min", &ringRadiusAnimationStartMin_, 0.0f, 2.0f, "%.2f");
+    ImGui::SliderFloat("Ring Start Radius Max", &ringRadiusAnimationStartMax_, 0.0f, 2.0f, "%.2f");
+    ImGui::SliderFloat("Ring End Radius Min", &ringRadiusAnimationEndMin_, 0.0f, 2.0f, "%.2f");
+    ImGui::SliderFloat("Ring End Radius Max", &ringRadiusAnimationEndMax_, 0.0f, 2.0f, "%.2f");
+    ImGui::Checkbox("Ring Angle Animation", &isRingAngleAnimationEnabled_);
+    ImGui::SliderFloat("Ring Angle Speed", &ringAngleAnimationSpeed_, 0.0f, 10.0f, "%.2f");
+    ImGui::SliderFloat("Ring Angle Base", &ringAngleAnimationBase_, 0.0f, 360.0f, "%.1f");
+    ImGui::SliderFloat("Ring Angle Span", &ringAngleAnimationSpan_, 0.0f, 360.0f, "%.1f");
 
     ImGui::SeparatorText("Particle Texture");
     const char* particleTextureNames[] = { "uvChecker", "Circle2", "Fence" };
@@ -607,6 +825,14 @@ void GameScene::Draw() {
     if (isPrimitivePreviewVisible_) {
         for (auto& primitivePreviewObject : primitivePreviewObjects_) {
             primitivePreviewObject->Draw();
+        }
+    }
+    if (isRingEffectVisible_) {
+        if (isRingEffectPlaneVisible_ && ringEffectPlane_) {
+            ringEffectPlane_->Draw();
+        }
+        if (ringEffect_) {
+            ringEffect_->Draw();
         }
     }
 

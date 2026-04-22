@@ -32,6 +32,19 @@ class Object3d {
         float time;
     };
 
+    struct RingAppearanceData {
+        int32_t enableRingAppearance;
+        int32_t uvDirection;
+        float innerRadiusRatio;
+        float startAlpha;
+        float endAlpha;
+        float startFadeRange;
+        float endFadeRange;
+        float padding;
+        Vector4 innerColor;
+        Vector4 outerColor;
+    };
+
 public:
     struct TransformationMatrix {
         Matrix4x4 WVP;
@@ -69,6 +82,15 @@ public:
     void SetRandomPreview(bool isPreview) { randomNoiseData_->previewRandom = isPreview ? 1 : 0; }
     void SetRandomIntensity(float intensity) { randomNoiseData_->intensity = intensity; }
     void SetRandomTime(float time) { randomNoiseData_->time = time; }
+    void SetRingAppearanceEnabled(bool isEnabled) { ringAppearanceData_->enableRingAppearance = isEnabled ? 1 : 0; }
+    void SetRingUVDirection(int32_t uvDirection) { ringAppearanceData_->uvDirection = uvDirection; }
+    void SetRingInnerRadiusRatio(float innerRadiusRatio) { ringAppearanceData_->innerRadiusRatio = innerRadiusRatio; }
+    void SetRingStartAlpha(float startAlpha) { ringAppearanceData_->startAlpha = startAlpha; }
+    void SetRingEndAlpha(float endAlpha) { ringAppearanceData_->endAlpha = endAlpha; }
+    void SetRingStartFadeRange(float startFadeRange) { ringAppearanceData_->startFadeRange = startFadeRange; }
+    void SetRingEndFadeRange(float endFadeRange) { ringAppearanceData_->endFadeRange = endFadeRange; }
+    void SetRingInnerColor(const Vector4& innerColor) { ringAppearanceData_->innerColor = innerColor; }
+    void SetRingOuterColor(const Vector4& outerColor) { ringAppearanceData_->outerColor = outerColor; }
 
     void SetScale(const Vector3& scale) { transform_.scale = scale; }
     void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
@@ -83,6 +105,7 @@ private:
     void CreateEnvironmentMapResource();
     void CreateDissolveResource();
     void CreateRandomNoiseResource();
+    void CreateRingAppearanceResource();
 
 private:
     Object3dCommon* object3dCommon_ = nullptr;
@@ -107,4 +130,7 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> randomNoiseResource_;
     RandomNoiseData* randomNoiseData_ = nullptr;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> ringAppearanceResource_;
+    RingAppearanceData* ringAppearanceData_ = nullptr;
 };

@@ -40,11 +40,26 @@ struct RandomNoiseData
     float time;
 };
 
+struct RingAppearanceData
+{
+    int enableRingAppearance;
+    int uvDirection;
+    float innerRadiusRatio;
+    float startAlpha;
+    float endAlpha;
+    float startFadeRange;
+    float endFadeRange;
+    float padding;
+    float4 innerColor;
+    float4 outerColor;
+};
+
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<EnvironmentMapData> gEnvironmentMapData : register(b2);
 ConstantBuffer<DissolveData> gDissolveData : register(b3);
 ConstantBuffer<RandomNoiseData> gRandomNoiseData : register(b4);
+ConstantBuffer<RingAppearanceData> gRingAppearanceData : register(b5);
 
 Texture2D<float4> gTexture : register(t0);
 TextureCube<float4> gEnvironmentTexture : register(t1);
@@ -70,10 +85,54 @@ float rand2dTo1d(float2 value)
     return frac(sin(dot(value, float2(12.9898f, 78.233f))) * 43758.5453f);
 }
 
+float2 GetRingLocalPosition(float2 uv)
+{
+    return float2((uv.x - 0.5f) * 2.0f, (0.5f - uv.y) * 2.0f);
+}
+
+float ComputeRingRadial(float2 uv)
+{
+    float radius = length(GetRingLocalPosition(uv));
+    float innerRadiusRatio = saturate(gRingAppearanceData.innerRadiusRatio);
+    return saturate((radius - innerRadiusRatio) / max(1.0f - innerRadiusRatio, 0.0001f));
+}
+
+float ComputeRingProgress(float2 uv)
+{
+    float2 local = GetRingLocalPosition(uv);
+    return frac(atan2(local.y, local.x) / (2.0f * 3.14159265359f) + 1.0f);
+}
+
+float ComputeRingStartAlpha(float progress)
+{
+    float fadeRange = max(gRingAppearanceData.startFadeRange, 0.0001f);
+    float blend = 1.0f - smoothstep(0.0f, fadeRange, progress);
+    return lerp(1.0f, gRingAppearanceData.startAlpha, blend);
+}
+
+float ComputeRingEndAlpha(float progress)
+{
+    float fadeRange = max(gRingAppearanceData.endFadeRange, 0.0001f);
+    float blend = smoothstep(1.0f - fadeRange, 1.0f, progress);
+    return lerp(1.0f, gRingAppearanceData.endAlpha, blend);
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     float4 transformedUV = mul(float4(input.uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 texColor = gTexture.Sample(gSampler, transformedUV.xy);
+    if (gRingAppearanceData.enableRingAppearance != 0)
+    {
+        float radial = ComputeRingRadial(transformedUV.xy);
+        float progress = ComputeRingProgress(transformedUV.xy);
+        float2 ringSampleUV = (gRingAppearanceData.uvDirection == 0) ?
+            float2(radial, 0.5f) :
+            float2(0.5f, radial);
+        float4 ringTint = lerp(gRingAppearanceData.innerColor, gRingAppearanceData.outerColor, radial);
+        float alphaFactor = ComputeRingStartAlpha(progress) * ComputeRingEndAlpha(progress);
+        texColor = gTexture.Sample(gSampler, ringSampleUV) * ringTint;
+        texColor.a *= alphaFactor;
+    }
     float dissolveEdge = 0.0f;
     if (gDissolveData.enableDissolve != 0)
     {
@@ -84,7 +143,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
     
     // Zバッファの不具合を防ぐため透明な部分は破棄
-    if (texColor.a <= 0.5f)
+    float alphaDiscardThreshold = (gRingAppearanceData.enableRingAppearance != 0) ? 0.01f : 0.5f;
+    if (texColor.a <= alphaDiscardThreshold)
     {
         discard;
     }

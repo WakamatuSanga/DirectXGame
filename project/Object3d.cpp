@@ -16,6 +16,7 @@ void Object3d::Initialize(Object3dCommon* object3dCommon) {
     CreateEnvironmentMapResource();
     CreateDissolveResource();
     CreateRandomNoiseResource();
+    CreateRingAppearanceResource();
 }
 
 void Object3d::Update() {
@@ -48,6 +49,7 @@ void Object3d::Draw() {
     commandList->SetGraphicsRootConstantBufferView(4, environmentMapResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(6, dissolveResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(8, randomNoiseResource_->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(9, ringAppearanceResource_->GetGPUVirtualAddress());
 
     if (environmentTextureIndex_ != static_cast<uint32_t>(-1)) {
         commandList->SetGraphicsRootDescriptorTable(5, TextureManager::GetInstance()->GetSrvHandleGPU(environmentTextureIndex_));
@@ -118,4 +120,20 @@ void Object3d::CreateRandomNoiseResource()
     randomNoiseData_->previewRandom = 0;
     randomNoiseData_->intensity = 1.0f;
     randomNoiseData_->time = 0.0f;
+}
+
+void Object3d::CreateRingAppearanceResource()
+{
+    ringAppearanceResource_ = object3dCommon_->GetDxCommon()->CreateBufferResource(sizeof(RingAppearanceData));
+    ringAppearanceResource_->Map(0, nullptr, reinterpret_cast<void**>(&ringAppearanceData_));
+    ringAppearanceData_->enableRingAppearance = 0;
+    ringAppearanceData_->uvDirection = 0;
+    ringAppearanceData_->innerRadiusRatio = 0.45f;
+    ringAppearanceData_->startAlpha = 1.0f;
+    ringAppearanceData_->endAlpha = 1.0f;
+    ringAppearanceData_->startFadeRange = 0.15f;
+    ringAppearanceData_->endFadeRange = 0.15f;
+    ringAppearanceData_->padding = 0.0f;
+    ringAppearanceData_->innerColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+    ringAppearanceData_->outerColor = { 1.0f, 0.6f, 0.2f, 1.0f };
 }
