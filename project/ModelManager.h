@@ -29,7 +29,15 @@ public:
     Model* CreateSphere(const std::string& keyName, uint32_t subdivision = 16);
     Model* CreatePlane(const std::string& keyName);
     Model* CreateCircle(const std::string& keyName, uint32_t subdivision = 32);
-    Model* CreateRing(const std::string& keyName, uint32_t subdivision = 32, float innerRadius = 0.5f, float outerRadius = 1.0f);
+    Model* CreateRing(
+        const std::string& keyName,
+        uint32_t subdivision = 32,
+        float innerRadius = 0.5f,
+        float outerRadius = 1.0f,
+        float startAngle = 0.0f,
+        float endAngle = 6.2831853f,
+        float startRadius = 1.0f,
+        float endRadius = 1.0f);
     Model* CreateTorus(const std::string& keyName, uint32_t majorSubdivision = 32, uint32_t minorSubdivision = 16);
     Model* CreateCylinder(const std::string& keyName, uint32_t subdivision = 32);
     Model* CreateCone(const std::string& keyName, uint32_t subdivision = 32);

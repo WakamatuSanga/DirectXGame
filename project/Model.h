@@ -50,7 +50,14 @@ public:
     static ModelData CreateSphereData(uint32_t subdivision = 16);
     static ModelData CreatePlaneData();
     static ModelData CreateCircleData(uint32_t subdivision = 32);
-    static ModelData CreateRingData(uint32_t subdivision = 32, float innerRadius = 0.5f, float outerRadius = 1.0f);
+    static ModelData CreateRingData(
+        uint32_t subdivision = 32,
+        float innerRadius = 0.5f,
+        float outerRadius = 1.0f,
+        float startAngle = 0.0f,
+        float endAngle = 6.2831853f,
+        float startRadius = 1.0f,
+        float endRadius = 1.0f);
     static ModelData CreateTorusData(uint32_t majorSubdivision = 32, uint32_t minorSubdivision = 16, float majorRadius = 0.7f, float minorRadius = 0.3f);
     static ModelData CreateCylinderData(uint32_t subdivision = 32, float radius = 1.0f, float height = 2.0f);
     static ModelData CreateConeData(uint32_t subdivision = 32, float radius = 1.0f, float height = 2.0f);

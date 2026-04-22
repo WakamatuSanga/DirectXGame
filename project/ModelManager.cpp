@@ -69,9 +69,17 @@ Model* ModelManager::CreateCircle(const std::string& keyName, uint32_t subdivisi
     return CreatePrimitive(keyName, Model::CreateCircleData(subdivision));
 }
 
-Model* ModelManager::CreateRing(const std::string& keyName, uint32_t subdivision, float innerRadius, float outerRadius)
+Model* ModelManager::CreateRing(
+    const std::string& keyName,
+    uint32_t subdivision,
+    float innerRadius,
+    float outerRadius,
+    float startAngle,
+    float endAngle,
+    float startRadius,
+    float endRadius)
 {
-    return CreatePrimitive(keyName, Model::CreateRingData(subdivision, innerRadius, outerRadius));
+    return CreatePrimitive(keyName, Model::CreateRingData(subdivision, innerRadius, outerRadius, startAngle, endAngle, startRadius, endRadius));
 }
 
 Model* ModelManager::CreateTorus(const std::string& keyName, uint32_t majorSubdivision, uint32_t minorSubdivision)
@@ -102,6 +110,7 @@ Model* ModelManager::CreateBox(const std::string& keyName)
 Model* ModelManager::CreatePrimitive(const std::string& keyName, const Model::ModelData& modelData)
 {
     if (models_.contains(keyName)) {
+        models_.at(keyName)->Initialize(modelCommon_.get(), modelData);
         return models_.at(keyName).get();
     }
 

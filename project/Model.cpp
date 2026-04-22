@@ -1,4 +1,5 @@
 #include "Model.h"
+#include "PrimitiveGenerator.h"
 #include "TextureManager.h"
 #include <cassert>
 #include <fstream>
@@ -169,46 +170,15 @@ Model::ModelData Model::CreateCircleData(uint32_t subdivision) {
     return data;
 }
 
-Model::ModelData Model::CreateRingData(uint32_t subdivision, float innerRadius, float outerRadius) {
-    ModelData data;
-    subdivision = (subdivision < 3) ? 3 : subdivision;
-    if (innerRadius < 0.0f) {
-        innerRadius = 0.0f;
-    }
-    if (outerRadius <= innerRadius) {
-        outerRadius = innerRadius + 0.5f;
-    }
-    data.material.textureIndex = GetPrimitiveTextureIndex();
-
-    for (uint32_t i = 0; i < subdivision; ++i) {
-        float angle0 = 2.0f * kPi * static_cast<float>(i) / static_cast<float>(subdivision);
-        float angle1 = 2.0f * kPi * static_cast<float>(i + 1) / static_cast<float>(subdivision);
-
-        float outerX0 = std::cos(angle0) * outerRadius;
-        float outerZ0 = std::sin(angle0) * outerRadius;
-        float outerX1 = std::cos(angle1) * outerRadius;
-        float outerZ1 = std::sin(angle1) * outerRadius;
-        float innerX0 = std::cos(angle0) * innerRadius;
-        float innerZ0 = std::sin(angle0) * innerRadius;
-        float innerX1 = std::cos(angle1) * innerRadius;
-        float innerZ1 = std::sin(angle1) * innerRadius;
-
-        auto MakeRingVertex = [outerRadius](float x, float z) {
-            return MakeVertex(
-                x, 0.0f, z,
-                x / (outerRadius * 2.0f) + 0.5f,
-                -z / (outerRadius * 2.0f) + 0.5f,
-                0.0f, 1.0f, 0.0f);
-            };
-
-        PushQuad(data,
-            MakeRingVertex(innerX0, innerZ0),
-            MakeRingVertex(outerX0, outerZ0),
-            MakeRingVertex(innerX1, innerZ1),
-            MakeRingVertex(outerX1, outerZ1));
-    }
-
-    return data;
+Model::ModelData Model::CreateRingData(
+    uint32_t subdivision,
+    float innerRadius,
+    float outerRadius,
+    float startAngle,
+    float endAngle,
+    float startRadius,
+    float endRadius) {
+    return PrimitiveGenerator::CreateRingData(subdivision, innerRadius, outerRadius, startAngle, endAngle, startRadius, endRadius);
 }
 
 Model::ModelData Model::CreateTorusData(uint32_t majorSubdivision, uint32_t minorSubdivision, float majorRadius, float minorRadius) {
