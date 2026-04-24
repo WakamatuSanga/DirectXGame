@@ -248,6 +248,15 @@ void GameScene::Initialize() {
         }
     }
 
+    effectCylinderModel_ = modelManager->CreateEffectCylinder("EffectCylinder", 32);
+    if (effectCylinderModel_) {
+        effectCylinderModel_->SetTextureIndex(texManager->GetTextureIndexByFilePath("resources/particle/gradationLine.png"));
+        if (auto* material = effectCylinderModel_->GetMaterialData()) {
+            material->enableLighting = 0;
+            material->alphaReference = 0.0f;
+        }
+    }
+
     ringEffectPlane_ = std::make_unique<Object3d>();
     ringEffectPlane_->Initialize(object3dCommon);
     ringEffectPlane_->SetModel(ringEffectPlaneModel_);
@@ -268,6 +277,14 @@ void GameScene::Initialize() {
     ringEffect_->SetRingEndFadeRange(ringEndFadeRange_);
     ringEffect_->SetRingInnerColor({ ringInnerColor_[0], ringInnerColor_[1], ringInnerColor_[2], ringInnerColor_[3] });
     ringEffect_->SetRingOuterColor({ ringOuterColor_[0], ringOuterColor_[1], ringOuterColor_[2], ringOuterColor_[3] });
+
+    effectCylinder_ = std::make_unique<Object3d>();
+    effectCylinder_->Initialize(object3dCommon);
+    effectCylinder_->SetModel(effectCylinderModel_);
+    effectCylinder_->SetCamera(camera_.get());
+    effectCylinder_->SetEnvironmentMapEnabled(false);
+    effectCylinder_->SetTranslate({ 3.0f, -1.0f, 3.0f });
+    effectCylinder_->SetScale({ 1.5f, 1.5f, 1.5f });
 
     auto createRingEffectPreviewObject = [&](std::unique_ptr<Object3d>& object, Model* model) {
         object = std::make_unique<Object3d>();
@@ -443,6 +460,28 @@ void GameScene::Update() {
     object3dSphere_->SetRandomTime(objectRandomTime_);
     object3d_->Update();
     object3dSphere_->Update();
+    if (effectCylinder_) {
+        effectCylinderTime_ += 0.016f;
+        if (effectCylinderModel_) {
+            if (auto* material = effectCylinderModel_->GetMaterialData()) {
+                material->color = {
+                    effectCylinderColor_[0],
+                    effectCylinderColor_[1],
+                    effectCylinderColor_[2],
+                    effectCylinderColor_[3]
+                };
+                if (isEffectCylinderUVScrollEnabled_) {
+                    material->uvTransform = MatrixMath::MakeAffine(
+                        { 1.0f, 1.0f, 1.0f },
+                        { 0.0f, 0.0f, 0.0f },
+                        { effectCylinderTime_ * effectCylinderUVScrollSpeedX_, effectCylinderTime_ * effectCylinderUVScrollSpeedY_, 0.0f });
+                } else {
+                    material->uvTransform = MatrixMath::MakeIdentity4x4();
+                }
+            }
+        }
+        effectCylinder_->Update();
+    }
     for (auto& primitivePreviewObject : primitivePreviewObjects_) {
         primitivePreviewObject->Update();
     }
@@ -1035,6 +1074,18 @@ void GameScene::Update() {
         ImGui::TextDisabled("Enable Ring Appearance Extensions to edit UV/color/alpha/animation settings.");
     }
 
+    ImGui::SeparatorText("Cylinder Portal Effect");
+    if (effectCylinder_) {
+        ImGui::ColorEdit4("Portal Color", effectCylinderColor_.data());
+        ImGui::Checkbox("Portal UV Scroll", &isEffectCylinderUVScrollEnabled_);
+        ImGui::SliderFloat2("Portal Scroll Speed", &effectCylinderUVScrollSpeedX_, -2.0f, 2.0f, "%.2f");
+        
+        Transform& cylTf = effectCylinder_->GetTransform();
+        ImGui::DragFloat3("Portal Pos", &cylTf.translate.x, 0.1f);
+        ImGui::DragFloat3("Portal Rot", &cylTf.rotate.x, 0.01f);
+        ImGui::DragFloat3("Portal Scl", &cylTf.scale.x, 0.1f);
+    }
+
     ImGui::SeparatorText("Particle Texture");
     const char* particleTextureNames[] = { "uvChecker", "Circle2", "Fence" };
     const char* particleTexturePaths[] = {
@@ -1149,6 +1200,11 @@ void GameScene::Draw() {
 
     object3d_->Draw();
     object3dSphere_->Draw();
+    if (effectCylinder_) {
+        object3dCommon->CommonDrawSetting(Object3dCommon::BlendMode::kAdd);
+        effectCylinder_->Draw();
+        object3dCommon->CommonDrawSetting((Object3dCommon::BlendMode)currentBlendMode_);
+    }
     if (isPrimitivePreviewVisible_) {
         for (auto& primitivePreviewObject : primitivePreviewObjects_) {
             primitivePreviewObject->Draw();

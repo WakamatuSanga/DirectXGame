@@ -27,6 +27,7 @@ private:
     std::unique_ptr<Object3d> object3dSphere_; // 球用
     std::unique_ptr<Object3d> ringEffectPlane_;
     std::unique_ptr<Object3d> ringEffect_;
+    std::unique_ptr<Object3d> effectCylinder_;
     std::unique_ptr<Object3d> ringEffectComparePlaneBillboard_;
     std::unique_ptr<Object3d> ringEffectCompareBillboard_;
     std::unique_ptr<Object3d> ringEffectComparePlaneWorld_;
@@ -38,6 +39,7 @@ private:
     Model* modelSphere_ = nullptr;
     Model* ringEffectModel_ = nullptr;
     Model* ringEffectPlaneModel_ = nullptr;
+    Model* effectCylinderModel_ = nullptr;
 
     uint32_t texIndexUvChecker_ = 0;
     uint32_t texIndexFence_ = 0;
@@ -114,6 +116,12 @@ private:
     float ringAngleAnimationSpeed_ = 1.0f;
     float ringAngleAnimationSpan_ = 180.0f;
     float ringAngleAnimationBase_ = 0.0f;
+
+    std::array<float, 4> effectCylinderColor_ = { 0.45f, 0.65f, 1.0f, 0.8f };
+    bool isEffectCylinderUVScrollEnabled_ = true;
+    float effectCylinderUVScrollSpeedX_ = 0.5f;
+    float effectCylinderUVScrollSpeedY_ = 0.0f;
+    float effectCylinderTime_ = 0.0f;
 
     float layoutStartX_ = -1.4f;
     float layoutStartY_ = -0.8f;
