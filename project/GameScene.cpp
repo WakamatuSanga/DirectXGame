@@ -20,6 +20,28 @@ namespace {
     constexpr float kRingOuterRadius = 1.0f;
     constexpr uint32_t kRingSubdivision = 32u;
 
+    CloudVolume::Parameters MakeRecommendedCloudParameters() {
+        CloudVolume::Parameters parameters{};
+        parameters.center = { 0.0f, 4.5f, 8.0f };
+        parameters.halfExtents = { 12.0f, 4.5f, 12.0f };
+        parameters.density = 0.85f;
+        parameters.absorption = 1.15f;
+        parameters.windDirection = { 1.0f, 0.0f, 0.25f };
+        parameters.windSpeed = 0.20f;
+        parameters.sunDirection = { 0.35f, -1.0f, 0.15f };
+        parameters.lightAbsorption = 0.75f;
+        parameters.color = { 0.98f, 0.99f, 1.00f, 1.00f };
+        parameters.noiseScale = 0.12f;
+        parameters.detailNoiseScale = 0.42f;
+        parameters.detailWeight = 0.20f;
+        parameters.edgeFade = 0.30f;
+        parameters.ambientLighting = 0.18f;
+        parameters.sunIntensity = 1.05f;
+        parameters.viewStepCount = 72;
+        parameters.lightStepCount = 8;
+        return parameters;
+    }
+
     float WrapDegrees(float degrees) {
         while (degrees < 0.0f) {
             degrees += 360.0f;
@@ -105,6 +127,9 @@ void GameScene::Initialize() {
     camera_ = std::make_unique<Camera>();
     camera_->SetTranslate({ 0.0f, 2.0f, -10.0f });
     camera_->SetRotate({ 0.1f, 0.0f, 0.0f });
+
+    cloudVolume_ = std::make_unique<CloudVolume>();
+    cloudVolume_->GetParameters() = MakeRecommendedCloudParameters();
 
     skybox_ = std::make_unique<Skybox>();
     skybox_->Initialize(MyGame::GetInstance()->GetSkyboxCommon());
@@ -246,6 +271,7 @@ void GameScene::Finalize() {}
 void GameScene::Update() {
     auto input = MyGame::GetInstance()->GetInput();
     auto particleManager = ParticleManager::GetInstance();
+    auto volumetricCloudPass = MyGame::GetInstance()->GetVolumetricCloudPass();
     auto dxCommon = MyGame::GetInstance()->GetDxCommon();
     auto modelManager = ModelManager::GetInstance();
     auto& postEffectParams = dxCommon->GetPostEffectParameters();
@@ -289,6 +315,15 @@ void GameScene::Update() {
     if (input->PushKey(DIK_0)) audio->PlayAudio("resources/sounds/Alarm01.mp3");
 
     camera_->Update();
+    if (cloudVolume_) {
+        // TODO: Replace this fixed timestep with the engine's shared delta time when that API is available.
+        cloudVolume_->Update(1.0f / 60.0f);
+    }
+    if (volumetricCloudPass && cloudVolume_) {
+        cloudProjectedBounds_ = volumetricCloudPass->BuildProjectedBounds(camera_.get(), cloudVolume_.get());
+    } else {
+        cloudProjectedBounds_ = {};
+    }
     objectRandomTime_ += 0.016f;
     ringAnimationTime_ += 0.016f;
 
@@ -493,6 +528,106 @@ void GameScene::Update() {
     ImGui::DragFloat3("Skybox Scale", &skyboxScale_.x, 1.0f, 1.0f, 1000.0f, "%.1f");
     ImGui::TextWrapped("DDS: %s", skyboxTexturePath_.c_str());
     ImGui::Text("TextureIndex: %u", skyboxTextureIndex_);
+
+    if (cloudVolume_) {
+        auto& cloudParams = cloudVolume_->GetParameters();
+
+        ImGui::SeparatorText("Volumetric Cloud");
+        if (volumetricCloudPass) {
+            bool isCloudPassEnabled = volumetricCloudPass->IsEnabled();
+            if (ImGui::Checkbox("Cloud Pass Enabled", &isCloudPassEnabled)) {
+                volumetricCloudPass->SetEnabled(isCloudPassEnabled);
+                cloudProjectedBounds_ = volumetricCloudPass->BuildProjectedBounds(camera_.get(), cloudVolume_.get());
+            }
+
+            const char* cloudForceModeNames[] = {
+                "None",
+                "Force Skip",
+                "Force Fullscreen",
+                "Force Scissor",
+                "Force Max Quality",
+                "Force Aggressive LOD"
+            };
+            int cloudForceMode = static_cast<int>(volumetricCloudPass->GetForceMode());
+            if (ImGui::Combo("Cloud Force Mode", &cloudForceMode, cloudForceModeNames, IM_ARRAYSIZE(cloudForceModeNames))) {
+                volumetricCloudPass->SetForceMode(static_cast<VolumetricCloudPass::ForceMode>(cloudForceMode));
+                cloudProjectedBounds_ = volumetricCloudPass->BuildProjectedBounds(camera_.get(), cloudVolume_.get());
+            }
+        }
+
+        if (ImGui::Button("Reset Cloud Preset")) {
+            cloudParams = MakeRecommendedCloudParameters();
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Recommended visible starting point");
+        ImGui::DragFloat3("Cloud Center", &cloudParams.center.x, 0.1f);
+        ImGui::DragFloat3("Cloud HalfExtents", &cloudParams.halfExtents.x, 0.1f, 0.1f, 100.0f, "%.2f");
+        ImGui::SliderFloat("Cloud Density", &cloudParams.density, 0.0f, 2.0f, "%.3f");
+        ImGui::SliderFloat("Cloud Absorption", &cloudParams.absorption, 0.01f, 8.0f, "%.2f");
+        ImGui::DragFloat3("Cloud Wind Dir", &cloudParams.windDirection.x, 0.01f, -1.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Cloud Wind Speed", &cloudParams.windSpeed, 0.0f, 5.0f, "%.2f");
+        ImGui::DragFloat3("Cloud Sun Dir", &cloudParams.sunDirection.x, 0.01f, -1.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Cloud Light Absorption", &cloudParams.lightAbsorption, 0.0f, 8.0f, "%.2f");
+        ImGui::ColorEdit4("Cloud Color (A = density scale)", &cloudParams.color.x);
+        ImGui::SliderFloat("Cloud Noise Scale", &cloudParams.noiseScale, 0.01f, 2.0f, "%.3f");
+        ImGui::SliderFloat("Cloud Detail Noise", &cloudParams.detailNoiseScale, 0.01f, 4.0f, "%.3f");
+        ImGui::SliderFloat("Cloud Detail Weight", &cloudParams.detailWeight, 0.0f, 1.5f, "%.2f");
+        ImGui::SliderFloat("Cloud Edge Fade", &cloudParams.edgeFade, 0.01f, 1.0f, "%.3f");
+        ImGui::SliderFloat("Cloud Ambient", &cloudParams.ambientLighting, 0.0f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Cloud Sun Intensity", &cloudParams.sunIntensity, 0.0f, 4.0f, "%.2f");
+
+        int cloudViewStepCount = static_cast<int>(cloudParams.viewStepCount);
+        if (ImGui::SliderInt("Cloud View Steps", &cloudViewStepCount, 1, 256)) {
+            cloudParams.viewStepCount = static_cast<uint32_t>(cloudViewStepCount);
+        }
+
+        int cloudLightStepCount = static_cast<int>(cloudParams.lightStepCount);
+        if (ImGui::SliderInt("Cloud Light Steps", &cloudLightStepCount, 1, 32)) {
+            cloudParams.lightStepCount = static_cast<uint32_t>(cloudLightStepCount);
+        }
+
+        if (volumetricCloudPass) {
+            const char* cloudDebugViewNames[] = {
+                "Final",
+                "Alpha only",
+                "Density only",
+                "Light only"
+            };
+            int cloudDebugView = static_cast<int>(volumetricCloudPass->GetDebugViewMode());
+            if (ImGui::Combo("Cloud Debug View", &cloudDebugView, cloudDebugViewNames, IM_ARRAYSIZE(cloudDebugViewNames))) {
+                volumetricCloudPass->SetDebugViewMode(
+                    static_cast<VolumetricCloudPass::DebugViewMode>(cloudDebugView));
+            }
+        }
+
+        ImGui::SeparatorText("Cloud Optimization Debug");
+        auto DrawCloudFlag = [](const char* label, bool value, const ImVec4& trueColor, const ImVec4& falseColor) {
+            ImGui::TextUnformatted(label);
+            ImGui::SameLine(220.0f);
+            ImGui::TextColored(value ? trueColor : falseColor, value ? "true" : "false");
+        };
+
+        DrawCloudFlag("Cloud Visible", cloudProjectedBounds_.isVisible, ImVec4(0.30f, 1.00f, 0.35f, 1.0f), ImVec4(1.00f, 0.35f, 0.35f, 1.0f));
+        DrawCloudFlag("Cloud Pass Skipped", cloudProjectedBounds_.isPassSkipped, ImVec4(1.00f, 0.35f, 0.35f, 1.0f), ImVec4(0.30f, 1.00f, 0.35f, 1.0f));
+        DrawCloudFlag("Fullscreen Fallback", cloudProjectedBounds_.isFullScreenFallback, ImVec4(1.00f, 0.80f, 0.25f, 1.0f), ImVec4(0.45f, 0.85f, 1.00f, 1.0f));
+        DrawCloudFlag("Use Fullscreen Scissor", cloudProjectedBounds_.useFullScreenScissor, ImVec4(1.00f, 0.80f, 0.25f, 1.0f), ImVec4(0.30f, 1.00f, 0.35f, 1.0f));
+        DrawCloudFlag("Camera Inside Cloud", cloudProjectedBounds_.isCameraInsideCloud, ImVec4(1.00f, 0.80f, 0.25f, 1.0f), ImVec4(0.45f, 0.85f, 1.00f, 1.0f));
+        DrawCloudFlag("Near Plane Crossing", cloudProjectedBounds_.isNearPlaneCrossing, ImVec4(1.00f, 0.80f, 0.25f, 1.0f), ImVec4(0.45f, 0.85f, 1.00f, 1.0f));
+
+        const LONG scissorWidth = cloudProjectedBounds_.scissorRect.right - cloudProjectedBounds_.scissorRect.left;
+        const LONG scissorHeight = cloudProjectedBounds_.scissorRect.bottom - cloudProjectedBounds_.scissorRect.top;
+        ImGui::Text("Scissor Rect: L=%ld T=%ld R=%ld B=%ld", cloudProjectedBounds_.scissorRect.left, cloudProjectedBounds_.scissorRect.top, cloudProjectedBounds_.scissorRect.right, cloudProjectedBounds_.scissorRect.bottom);
+        ImGui::Text("Scissor Size: %ld x %ld", scissorWidth, scissorHeight);
+        ImGui::TextColored(
+            (cloudProjectedBounds_.scissorAreaRatio >= 0.90f) ? ImVec4(1.00f, 0.45f, 0.35f, 1.0f) : ImVec4(0.35f, 1.00f, 0.45f, 1.0f),
+            "Scissor Area Ratio: %.3f (%.1f%%)",
+            cloudProjectedBounds_.scissorAreaRatio,
+            cloudProjectedBounds_.scissorAreaRatio * 100.0f);
+        ImGui::Text("Current ViewStep Scale: %.3f", cloudProjectedBounds_.currentViewStepScale);
+        ImGui::Text("Current LightStep Scale: %.3f", cloudProjectedBounds_.currentLightStepScale);
+        ImGui::Text("Estimated View Steps: %u", cloudProjectedBounds_.estimatedViewSteps);
+        ImGui::Text("Estimated Light Steps: %u", cloudProjectedBounds_.estimatedLightSteps);
+    }
 
     ImGui::SeparatorText("Environment Map");
     ImGui::Checkbox("Reflect Sphere", &isSphereEnvironmentMapEnabled_);
@@ -805,11 +940,19 @@ void GameScene::Update() {
     ImGui::Combo("Blend", &currentBlendMode_, blendModeNames_, IM_ARRAYSIZE(blendModeNames_));
     ImGui::End();
 #endif
+
+    if (volumetricCloudPass && cloudVolume_) {
+        cloudProjectedBounds_ = volumetricCloudPass->BuildProjectedBounds(camera_.get(), cloudVolume_.get());
+    } else {
+        cloudProjectedBounds_ = {};
+    }
     }
 
 void GameScene::Draw() {
+    auto dxCommon = MyGame::GetInstance()->GetDxCommon();
     auto object3dCommon = MyGame::GetInstance()->GetObject3dCommon();
     auto skyboxCommon = MyGame::GetInstance()->GetSkyboxCommon();
+    auto volumetricCloudPass = MyGame::GetInstance()->GetVolumetricCloudPass();
     auto particleManager = ParticleManager::GetInstance();
     auto spriteCommon = MyGame::GetInstance()->GetSpriteCommon();
 
@@ -833,6 +976,23 @@ void GameScene::Draw() {
         }
         if (ringEffect_) {
             ringEffect_->Draw();
+        }
+    }
+
+    if (volumetricCloudPass && cloudVolume_) {
+        if (cloudProjectedBounds_.isVisible && !cloudProjectedBounds_.isPassSkipped) {
+            dxCommon->TransitionDepthBuffer(
+                D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            volumetricCloudPass->Render(camera_.get(), cloudVolume_.get(), cloudProjectedBounds_);
+            dxCommon->TransitionDepthBuffer(
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+            ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList();
+            D3D12_CPU_DESCRIPTOR_HANDLE sceneRTV = dxCommon->GetRenderTextureRTV();
+            D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = dxCommon->GetDepthStencilView();
+            commandList->OMSetRenderTargets(1, &sceneRTV, FALSE, &depthStencilView);
         }
     }
 

@@ -37,6 +37,9 @@ void MyGame::Initialize() {
     skyboxCommon_ = std::make_unique<SkyboxCommon>();
     skyboxCommon_->Initialize(dxCommon_.get());
 
+    volumetricCloudPass_ = std::make_unique<VolumetricCloudPass>();
+    volumetricCloudPass_->Initialize(dxCommon_.get());
+
     modelManager_ = ModelManager::GetInstance();
     modelManager_->Initialize(dxCommon_.get());
 
