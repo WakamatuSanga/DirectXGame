@@ -92,6 +92,11 @@ Model* ModelManager::CreateCylinder(const std::string& keyName, uint32_t subdivi
     return CreatePrimitive(keyName, Model::CreateCylinderData(subdivision));
 }
 
+Model* ModelManager::CreateEffectCylinder(const std::string& keyName, uint32_t subdivision)
+{
+    return CreatePrimitive(keyName, Model::CreateEffectCylinderData(subdivision));
+}
+
 Model* ModelManager::CreateCone(const std::string& keyName, uint32_t subdivision)
 {
     return CreatePrimitive(keyName, Model::CreateConeData(subdivision));

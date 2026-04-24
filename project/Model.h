@@ -29,6 +29,8 @@ public:
         int32_t enableLighting;
         float padding[3];
         Matrix4x4 uvTransform;
+        float alphaReference;
+        float padding2[3];
     };
 
 public:
@@ -60,6 +62,7 @@ public:
         float endRadius = 1.0f);
     static ModelData CreateTorusData(uint32_t majorSubdivision = 32, uint32_t minorSubdivision = 16, float majorRadius = 0.7f, float minorRadius = 0.3f);
     static ModelData CreateCylinderData(uint32_t subdivision = 32, float radius = 1.0f, float height = 2.0f);
+    static ModelData CreateEffectCylinderData(uint32_t subdivision = 32, float topRadius = 1.0f, float bottomRadius = 1.0f, float height = 3.0f);
     static ModelData CreateConeData(uint32_t subdivision = 32, float radius = 1.0f, float height = 2.0f);
     static ModelData CreateTriangleData();
     static ModelData CreateBoxData();

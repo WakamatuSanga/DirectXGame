@@ -40,6 +40,7 @@ public:
         float endRadius = 1.0f);
     Model* CreateTorus(const std::string& keyName, uint32_t majorSubdivision = 32, uint32_t minorSubdivision = 16);
     Model* CreateCylinder(const std::string& keyName, uint32_t subdivision = 32);
+    Model* CreateEffectCylinder(const std::string& keyName, uint32_t subdivision = 32);
     Model* CreateCone(const std::string& keyName, uint32_t subdivision = 32);
     Model* CreateTriangle(const std::string& keyName);
     Model* CreateBox(const std::string& keyName);

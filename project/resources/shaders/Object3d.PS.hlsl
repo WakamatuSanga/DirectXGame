@@ -12,6 +12,7 @@ struct Material
     float4 color;
     int enableLighting;
     float4x4 uvTransform;
+    float alphaReference;
 };
 
 struct EnvironmentMapData
@@ -143,7 +144,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
     
     // Zバッファの不具合を防ぐため透明な部分は破棄
-    float alphaDiscardThreshold = (gRingAppearanceData.enableRingAppearance != 0) ? 0.01f : 0.5f;
+    float alphaDiscardThreshold = (gRingAppearanceData.enableRingAppearance != 0) ? 0.01f : gMaterial.alphaReference;
     if (texColor.a <= alphaDiscardThreshold)
     {
         discard;

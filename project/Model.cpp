@@ -83,6 +83,7 @@ void Model::Initialize(ModelCommon* modelCommon, const ModelData& modelData) {
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     materialData_->enableLighting = 1;
     materialData_->uvTransform = MakeIdentity4x4();
+    materialData_->alphaReference = 0.5f;
 }
 
 void Model::Draw() {
@@ -260,6 +261,38 @@ Model::ModelData Model::CreateCylinderData(uint32_t subdivision, float radius, f
         VertexData bottom0 = MakeVertex(x0, -halfHeight, z0, x0 / (radius * 2.0f) + 0.5f, z0 / (radius * 2.0f) + 0.5f, 0.0f, -1.0f, 0.0f);
         VertexData bottom1 = MakeVertex(x1, -halfHeight, z1, x1 / (radius * 2.0f) + 0.5f, z1 / (radius * 2.0f) + 0.5f, 0.0f, -1.0f, 0.0f);
         PushTriangle(data, bottomCenter, bottom0, bottom1);
+    }
+
+    return data;
+}
+
+Model::ModelData Model::CreateEffectCylinderData(uint32_t subdivision, float topRadius, float bottomRadius, float height) {
+    ModelData data;
+    subdivision = (subdivision < 3) ? 3 : subdivision;
+    data.material.textureIndex = GetPrimitiveTextureIndex();
+
+    float radianPerDivide = 2.0f * kPi / static_cast<float>(subdivision);
+
+    for (uint32_t index = 0; index < subdivision; ++index) {
+        float sinVal = std::sin(index * radianPerDivide);
+        float cosVal = std::cos(index * radianPerDivide);
+        float sinNext = std::sin((index + 1) * radianPerDivide);
+        float cosNext = std::cos((index + 1) * radianPerDivide);
+        float u = static_cast<float>(index) / static_cast<float>(subdivision);
+        float uNext = static_cast<float>(index + 1) / static_cast<float>(subdivision);
+
+        float vTop = 1.0f; // Slide 3: flip v
+        float vBottom = 0.0f;
+
+        PushTriangle(data,
+            MakeVertex(-sinVal * topRadius, height, cosVal * topRadius, u, vTop, -sinVal, 0.0f, cosVal),
+            MakeVertex(-sinNext * topRadius, height, cosNext * topRadius, uNext, vTop, -sinNext, 0.0f, cosNext),
+            MakeVertex(-sinVal * bottomRadius, 0.0f, cosVal * bottomRadius, u, vBottom, -sinVal, 0.0f, cosVal));
+
+        PushTriangle(data,
+            MakeVertex(-sinVal * bottomRadius, 0.0f, cosVal * bottomRadius, u, vBottom, -sinVal, 0.0f, cosVal),
+            MakeVertex(-sinNext * topRadius, height, cosNext * topRadius, uNext, vTop, -sinNext, 0.0f, cosNext),
+            MakeVertex(-sinNext * bottomRadius, 0.0f, cosNext * bottomRadius, uNext, vBottom, -sinNext, 0.0f, cosNext));
     }
 
     return data;
