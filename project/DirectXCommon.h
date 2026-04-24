@@ -85,6 +85,7 @@ public:
     ID3D12DescriptorHeap* GetSrvDescriptorHeap() const { return srvDescriptorHeap.Get(); }
     ID3D12DescriptorHeap* GetRtvDescriptorHeap() const { return rtvDescriptorHeap.Get(); }
     ID3D12DescriptorHeap* GetDsvDescriptorHeap() const { return dsvDescriptorHeap.Get(); }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() const { return dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(); }
 
     UINT GetSrvDescriptorSize() const { return descriptorSizeSRV; }
 
@@ -111,6 +112,7 @@ public:
     const PostEffectParameters& GetPostEffectParameters() const { return postEffectParameters_; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
     D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
+    void TransitionDepthBuffer(D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
 
     // ============================
     // 追加関数

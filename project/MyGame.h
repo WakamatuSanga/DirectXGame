@@ -9,6 +9,7 @@
 #include "SkyboxCommon.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "VolumetricCloudPass.h"
 #include "Input.h"
 #include "ImGuiManager.h"
 #include "Audio.h"
@@ -32,6 +33,7 @@ public:
     Object3dCommon* GetObject3dCommon() const { return object3dCommon_.get(); }
     SkyboxCommon* GetSkyboxCommon() const { return skyboxCommon_.get(); }
     SpriteCommon* GetSpriteCommon() const { return spriteCommon_.get(); }
+    VolumetricCloudPass* GetVolumetricCloudPass() const { return volumetricCloudPass_.get(); }
 
 private:
     MyGame() = default;
@@ -54,6 +56,7 @@ private:
     std::unique_ptr<SpriteCommon> spriteCommon_;
     std::unique_ptr<Object3dCommon> object3dCommon_;
     std::unique_ptr<SkyboxCommon> skyboxCommon_;
+    std::unique_ptr<VolumetricCloudPass> volumetricCloudPass_;
     std::unique_ptr<Input> input_;
 
     // --- マネージャーへの参照 (所有権を持たないため 生ポインタ でOK) ---

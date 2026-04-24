@@ -2,9 +2,11 @@
 #include "IScene.h"
 #include "Model.h"
 #include "Camera.h"
+#include "CloudVolume.h"
 #include "Object3d.h"
 #include "Skybox.h"
 #include "Sprite.h"
+#include "VolumetricCloudPass.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -19,6 +21,7 @@ public:
 
 private:
     std::unique_ptr<Camera> camera_;
+    std::unique_ptr<CloudVolume> cloudVolume_;
     std::unique_ptr<Skybox> skybox_;
     std::unique_ptr<Object3d> object3d_;       // フェンス用
     std::unique_ptr<Object3d> object3dSphere_; // 球用
@@ -109,6 +112,7 @@ private:
     float layoutStepX_ = 0.22f;
     float layoutStepY_ = 0.11f;
     float layoutStepZ_ = 0.05f;
+    VolumetricCloudPass::ProjectedBounds cloudProjectedBounds_{};
 
 #ifdef _DEBUG
     const char* blendModeNames_[6] = { "Normal", "Add", "Subtract", "Multiply", "Screen", "None" };
