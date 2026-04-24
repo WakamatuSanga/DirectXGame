@@ -27,12 +27,17 @@ private:
     std::unique_ptr<Object3d> object3dSphere_; // 球用
     std::unique_ptr<Object3d> ringEffectPlane_;
     std::unique_ptr<Object3d> ringEffect_;
+    std::unique_ptr<Object3d> ringEffectComparePlaneBillboard_;
+    std::unique_ptr<Object3d> ringEffectCompareBillboard_;
+    std::unique_ptr<Object3d> ringEffectComparePlaneWorld_;
+    std::unique_ptr<Object3d> ringEffectCompareWorld_;
     std::unique_ptr<Sprite> debugSprite_;
     std::vector<std::unique_ptr<Object3d>> primitivePreviewObjects_;
 
     Model* modelFence_ = nullptr;
     Model* modelSphere_ = nullptr;
     Model* ringEffectModel_ = nullptr;
+    Model* ringEffectPlaneModel_ = nullptr;
 
     uint32_t texIndexUvChecker_ = 0;
     uint32_t texIndexFence_ = 0;
@@ -68,11 +73,15 @@ private:
     bool isPrimitivePreviewVisible_ = true;
     bool isRingEffectVisible_ = true;
     bool isRingEffectPlaneVisible_ = true;
+    bool isRingEffectCompareVisible_ = true;
     bool isRingBillboardEnabled_ = true;
     Vector3 ringEffectTranslate_ = { 0.0f, 1.2f, 3.0f };
     Vector3 ringEffectRotate_ = { 0.0f, 0.0f, 0.0f };
     Vector3 ringEffectScale_ = { 1.6f, 1.6f, 1.0f };
     float ringEffectPlaneScale_ = 1.35f;
+    float ringEffectCompareSpacing_ = 4.2f;
+    std::array<float, 4> ringEffectPlaneColor_ = { 0.45f, 0.65f, 1.0f, 0.55f };
+    std::array<float, 4> ringEffectColor_ = { 1.0f, 1.0f, 1.0f, 0.9f };
     bool isRingAppearancePreviewEnabled_ = false;
     int currentRingUVDirection_ = 0;
     std::array<float, 4> ringInnerColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
